@@ -15,4 +15,4 @@ echo "Running simulation: sim_circular_config.py..."
 
 # 4. Execute the script
 # We use the full path to the experiment file
-python experiments/sim_cuboctahedron.py
+python experiments/plot_geometries.py
