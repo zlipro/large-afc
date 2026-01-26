@@ -57,3 +57,22 @@ def stress_normalizer(stress_mat):
         np.ndarray: The normalized stress matrix.
     """
     return stress_mat / np.linalg.norm(stress_mat, 2)
+
+def generate_points_in_rect(corners, num_points=60):
+    """
+    Generates random points inside a rectangular box.
+    corners: 3x8 numpy array
+    """
+    # Find min and max for each axis
+    min_coords = np.min(corners, axis=1) # [min_x, min_y, min_z]
+    max_coords = np.max(corners, axis=1) # [max_x, max_y, max_z]
+    
+    # Generate random points
+    # Each row is a dimension (X, Y, Z)
+    points = np.random.uniform(
+        low=min_coords[:, np.newaxis], 
+        high=max_coords[:, np.newaxis], 
+        size=(3, num_points)
+    )
+    
+    return points

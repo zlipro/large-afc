@@ -11,8 +11,8 @@ export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 # 3. Change directory to root so save paths (./results/...) resolve correctly
 cd "$PROJECT_ROOT"
 
-echo "Running simulation: sim_circular_config.py..."
+echo "Running simulation: hand.py..."
 
 # 4. Execute the script
 # We use the full path to the experiment file
-python experiments/plot_geometries.py
+python experiments/hand.py
