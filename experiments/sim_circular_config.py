@@ -6,7 +6,7 @@ from src.utils.utils import detect_num_edges, stress_normalizer
 from src import stress
 from src.graph import Graph
 from src.utils.plots import visualize_graph
-from src.control import affine_formation_control_global, trackig_error
+from src.control import affine_formation_control_global, tracking_error
 
 from src.sota import yang2019, xiao2022, li2026, lin2016
 
@@ -49,14 +49,14 @@ if __name__ == "__main__":
     print(f"Number of edges in Li et al. 2026 stress: {detect_num_edges(stress_mat_li2026, SPARSE_TOL)}")
     print(f"Number of edges in Lin et al. 2016 stress: {detect_num_edges(stress_mat_lin2016, SPARSE_TOL)}")
 
-    TE = trackig_error(
+    TE = tracking_error(
         affine_formation_control_global(
             nominal_config, stress_mat, None, gain=50
         ),
         nominal_config
     )
 
-    TE_yang2019 = trackig_error(
+    TE_yang2019 = tracking_error(
         affine_formation_control_global(
             nominal_config, 
             stress_mat_yang,
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         nominal_config
     )
 
-    TE_xiao2022 = trackig_error(
+    TE_xiao2022 = tracking_error(
         affine_formation_control_global(
             nominal_config, 
             stress_mat_xiao,
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         nominal_config
     )
 
-    TE_li2026 = trackig_error(
+    TE_li2026 = tracking_error(
         affine_formation_control_global(
             nominal_config,
             stress_mat_li2026,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         nominal_config
     )
 
-    TE_lin2016 = trackig_error(
+    TE_lin2016 = tracking_error(
         affine_formation_control_global(
             nominal_config,
             stress_mat_lin2016,

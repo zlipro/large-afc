@@ -2,7 +2,7 @@ import numpy as np
 from itertools import product
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial import KDTree
-from utils import generate_points_in_rect
+from .utils import generate_points_in_rect, stitch_clusters
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -86,7 +86,7 @@ def cuboctahedron():
                 
     return vertices, adj_matrix
 
-from itertools import product
+
 
 def truncated_icosahedron():
     """
@@ -329,6 +329,10 @@ def letter_w(filling_points_per_seg = 50):
                             [1.0, 0.0, 1.0],
                             [-1.0, 0.0, 1.0],
                             [-1.0, 0.0, -1.0]]).T
+    
+    num_interfacing_pts = unit_square.shape[1]  # 4 corners (later could be more pts on a plane)
+    
+    translation_vector = np.array([[0.0, 5.0, 0.0]]).T
 
     # --- the base "bar" shape ---
 
@@ -339,21 +343,43 @@ def letter_w(filling_points_per_seg = 50):
     
     # Define positions by shifting the unit square
     middle_hinge = unit_square
-    left_hinge   = middle_hinge + np.array([[0.0, -5.0, 0.0]]).T
-    right_hinge  = middle_hinge + np.array([[0.0, 5.0, 0.0]]).T
-    left_tip     = left_hinge   + np.array([[0.0, -5.0, 0.0]]).T
-    right_tip    = right_hinge  + np.array([[0.0, 5.0, 0.0]]).T
+    left_hinge   = middle_hinge - translation_vector
+    right_hinge  = middle_hinge + translation_vector
+    left_tip     = left_hinge   - translation_vector
+    right_tip    = right_hinge  + translation_vector
 
+    # random filling points between hinges, duplicate for all segments
     seg_1 = generate_points_in_rect(np.hstack([left_tip, left_hinge]), num_points=filling_points_per_seg)
-    seg_2 = generate_points_in_rect(np.hstack([left_hinge, middle_hinge]), num_points=filling_points_per_seg)
-    seg_3 = generate_points_in_rect(np.hstack([middle_hinge, right_hinge]), num_points=filling_points_per_seg)
-    seg_4 = generate_points_in_rect(np.hstack([right_hinge, right_tip]), num_points=filling_points_per_seg)
+    seg_2 = seg_1 + translation_vector
+    seg_3 = seg_2 + translation_vector
+    seg_4 = seg_3 + translation_vector
+    
 
     clusters_1 = np.hstack([left_tip, seg_1, left_hinge])
     clusters_2 = np.hstack([left_hinge, seg_2, middle_hinge])
     clusters_3 = np.hstack([middle_hinge, seg_3, right_hinge])
     clusters_4 = np.hstack([right_hinge, seg_4, right_tip])
 
+    # check if all clusters are identical upto a translation
+    try:
+        # Check Cluster 2 vs Cluster 1
+        assert np.allclose(clusters_2, clusters_1 + translation_vector), "Cluster 2 is not a translation of Cluster 1"
+        
+        # Check Cluster 3 vs Cluster 2
+        assert np.allclose(clusters_3, clusters_2 + translation_vector), "Cluster 3 is not a translation of Cluster 2"
+        
+        # Check Cluster 4 vs Cluster 3
+        assert np.allclose(clusters_4, clusters_3 + translation_vector), "Cluster 4 is not a translation of Cluster 3"
+        
+        print("Assertion Passed: All clusters are identical up to a translation of [0, 5, 0].")
+
+    except AssertionError as e:
+        print(f"Assertion Failed: {e}")
+
+    config_bar = [clusters_1, clusters_2, clusters_3, clusters_4]
+
+
+    # --- The V shape by shearing the middle hinges ---
     shearing_matrix_left = np.array([[1.0, 0, 0.0],
                                     [0.0, 1.0, 0.0],
                                     [0.0, 2.0, 1.0]])
@@ -367,76 +393,70 @@ def letter_w(filling_points_per_seg = 50):
     clusters_3 = shearing_matrix_right @ clusters_3
     clusters_4 = shearing_matrix_right @ clusters_4
 
-    return np.hstack([clusters_1, clusters_2, clusters_3, clusters_4])
-
-    # return np.hstack([left_tip, seg_1, left_hinge, seg_2, middle_hinge, seg_3, right_hinge, seg_4, right_tip])
-
-    # Stack them: (3, 20)
-    skeleton_positions_bar = np.hstack([left_tip, left_hinge, middle_hinge, right_hinge, right_tip])
-
-    # --- The V shape by shearing the middle hinges ---
-
-    # Shearing matrix
-    shearing_matrix_left = np.array([[1.0, 0, 0.0],
-                                    [0.0, 1.0, 0.0],
-                                    [0.0, 2.0, 1.0]])
-    
-    shearing_matrix_right = np.array([[1.0, 0, 0.0],
-                                    [0.0, 1.0, 0.0],
-                                    [0.0, -2.0, 1.0]])
-    
-    # Apply shearing to only middle hinges, left hinges and left tips
-    skeleton_positions_v = np.hstack([shearing_matrix_left @ skeleton_positions_bar[:,0:12],
-                                      shearing_matrix_right @ skeleton_positions_bar[:,12:20]])
-
+    config_V = [clusters_1, clusters_2, clusters_3, clusters_4]
 
     # --- The W shape by applying another shearing ---
-
+    # 1. Define the connection points (Hinges)
+    # In the V-shape, the hinges have moved due to the first shear.
+    # Left hinge was at [0, -5, 0]. After shear (slope 2), Z becomes 2*(-5) = -10.
+    left_hinge_pt = np.array([[0.0, -5.0, -10.0]]).T
     
-    return skeleton_positions_v
-def plot_letter_w_colored(w_data, filling_points_per_seg=50):
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
+    # Right hinge was at [0, 5, 0]. After shear (slope -2), Z becomes -2*(5) = -10.
+    right_hinge_pt = np.array([[0.0, 5.0, -10.0]]).T
 
-    # Each segment structure: 
-    # [Hinge (4 pts)] + [Filling (filling_points_per_seg * 4 pts)]
-    # Total points per segment block = 4 + (filling_points_per_seg * 4)
-    pts_per_hinge = 4
-    pts_per_filling = filling_points_per_seg * 4
-    step = pts_per_hinge + pts_per_filling
+    # 2. Define the "Correction" Shears
+    # Cluster 1 currently has slope +2 (from the V setup). We want slope -2.
+    # We need a net change of -4.
+    shear_fix_left = np.array([[1.0, 0.0, 0.0],
+                               [0.0, 1.0, 0.0],
+                               [0.0, -4.0, 1.0]])
+
+    # Cluster 4 currently has slope -2 (from the V setup). We want slope +2.
+    # We need a net change of +4.
+    shear_fix_right = np.array([[1.0, 0.0, 0.0],
+                                [0.0, 1.0, 0.0],
+                                [0.0, 4.0, 1.0]])
+
+    # 3. Apply transformation Relative to the Hinges
+    # Logic: Move to origin -> Shear -> Move back to hinge
     
-    colors = ['#FF5733', '#33FF57', '#3357FF', '#F333FF']
-    labels = ['Segment 1', 'Segment 2', 'Segment 3', 'Segment 4']
+    # Shift to center the hinge at (0,0,0)
+    c1_centered = clusters_1 - left_hinge_pt
+    # Apply shear
+    c1_sheared = shear_fix_left @ c1_centered
+    # Shift back
+    clusters_1_W = c1_sheared + left_hinge_pt
 
-    # Slice the concatenated array and plot each segment
-    for i in range(4):
-        start_idx = i * step
-        end_idx = (i + 1) * step + pts_per_hinge # Include the closing hinge
-        
-        segment = w_data[:, start_idx:end_idx]
-        
-        ax.scatter(segment[0, :], segment[1, :], segment[2, :], 
-                   c=colors[i], label=labels[i], s=10)
+    # --- Fix Right Wing (Cluster 4) ---
+    # Shift to center the hinge at (0,0,0)
+    c4_centered = clusters_4 - right_hinge_pt
+    # Apply shear
+    c4_sheared = shear_fix_right @ c4_centered
+    # Shift back
+    clusters_4_W = c4_sheared + right_hinge_pt
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title('3D Letter W - Segmented Coloring')
-    ax.legend()
+    # 4. Combine into final W Configuration
+    # (Clusters 2 and 3 are untouched as they form the inner V)
+    config_W = [clusters_1_W, clusters_2, clusters_3, clusters_4_W]
+
+    # --- Merge Clusters into Single Configuration & Get Indices ---
+    merged_config_bar, cluster_indices = stitch_clusters(config_bar, num_interfacing_pts)
+    merged_config_V, _ = stitch_clusters(config_V, num_interfacing_pts)
+    merged_config_W, _ = stitch_clusters(config_W, num_interfacing_pts)
+
+
+    nominal_configs = {"nominal_config_bar": merged_config_bar,
+                       "nominal_config_V": merged_config_V,
+                       "nominal_config_W": merged_config_W}
     
-    # Adjust view for better perspective of the W shape
-    ax.view_init(elev=20, azim=30)
-    plt.show()
-
-# Usage:
-# w_points = letter_w(filling_points_per_seg=50)
-# plot_letter_w_colored(w_points, filling_points_per_seg=50)
+    return nominal_configs, cluster_indices
 
 if __name__ == "__main__":
-    w_points = letter_w(filling_points_per_seg=60)
+    w_points, cluster_indices = letter_w(filling_points_per_seg = 70)
     # print(w_points.shape)
     # plot_letter_w_colored(w_points, filling_points_per_seg=50)
 
+    print("Cluster Indices:", cluster_indices)
     # plot w_points
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
