@@ -5,7 +5,6 @@ import src.utils.geometry as geometry
 from src.utils.utils import detect_num_edges, stress_normalizer
 from src import stress
 from src.graph import Graph
-from src.utils.plots import visualize_graph
 from src.control import affine_formation_control_global, tracking_error
 
 from src.sota import yang2019, xiao2022, li2026, lin2016
@@ -16,18 +15,18 @@ if __name__ == "__main__":
 
 
     NUM_NODES = 10
-    SPARSE_TOL = 5e-5
+    SPARSE_TOL = 1e-5
     nominal_config = geometry.circular_config(NUM_NODES, radius=2)
     # random configuration
     # nominal_config = np.random.rand(2, NUM_NODES) * 4
 
     hyperparam_dict = { 'alpha': 0.6, 'beta': 1, 'gamma': 0.1 }
-    stress_mat = stress_normalizer(stress.optimize_stress(nominal_config, hyperparam_dict, sparse_tol = SPARSE_TOL, message=True))
+    stress_mat = stress_normalizer(stress.sparsity_truncation(SPARSE_TOL, stress.optimize_stress(nominal_config, hyperparam_dict)))
     stress_mat_yang = stress_normalizer(yang2019.sparse_nullspace_recon(nominal_config))
 
     # xiao2022.check_solvers()
-    stress_mat_xiao = stress_normalizer(xiao2022.misdp_faithful(nominal_config))
-    # stress_mat_xiao = np.zeros((NUM_NODES, NUM_NODES))  # Placeholder if xiao2022 solver is not available
+    # stress_mat_xiao = stress_normalizer(xiao2022.misdp_faithful(nominal_config))
+    stress_mat_xiao = np.zeros((NUM_NODES, NUM_NODES))  # Placeholder if xiao2022 solver is not available
 
     stress_mat_li2026 = stress_normalizer(li2026.vertex_additions(nominal_config))
 
@@ -49,9 +48,10 @@ if __name__ == "__main__":
     print(f"Number of edges in Li et al. 2026 stress: {detect_num_edges(stress_mat_li2026, SPARSE_TOL)}")
     print(f"Number of edges in Lin et al. 2016 stress: {detect_num_edges(stress_mat_lin2016, SPARSE_TOL)}")
 
+    gain = 70
     TE = tracking_error(
         affine_formation_control_global(
-            nominal_config, stress_mat, None, gain=50
+            nominal_config, stress_mat, None, gain=gain
         ),
         nominal_config
     )
@@ -61,7 +61,7 @@ if __name__ == "__main__":
             nominal_config, 
             stress_mat_yang,
             None,
-            gain=50
+            gain=gain
         ),
         nominal_config
     )
@@ -71,7 +71,7 @@ if __name__ == "__main__":
             nominal_config, 
             stress_mat_xiao,
             None,
-            gain=50
+            gain=gain
         ),
         nominal_config
     )
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             nominal_config,
             stress_mat_li2026,
             None,
-            gain=50
+            gain=gain
         ),
         nominal_config
     )
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             nominal_config,
             stress_mat_lin2016,
             None,
-            gain=50
+            gain=gain
         ),
         nominal_config
     )
@@ -109,6 +109,7 @@ if __name__ == "__main__":
     plt.xlabel("Iteration")
     plt.ylabel("Tracking Error (log scale)")
     plt.savefig("results/circular_stress_configuration.png", dpi=300)
+    plt.show()
 
     # Calculate eigenvalues
     eigenvalues_stress = np.linalg.eigvals(stress_mat)

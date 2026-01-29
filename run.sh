@@ -11,8 +11,8 @@ export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 # 3. Change directory to root so save paths (./results/...) resolve correctly
 cd "$PROJECT_ROOT"
 
-echo "Running simulation: football_time.py..."
+echo "Running simulation: multicluster_control.py..."
 
 # 4. Execute the script
 # We use the full path to the experiment file
-python experiments/football_time.py
+python experiments/plot_geometries.py

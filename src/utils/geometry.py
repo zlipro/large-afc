@@ -323,7 +323,7 @@ def nested_football():
 
 
 
-def letter_w(filling_points_per_seg = 50):
+def letter_w(filling_points_per_seg = 50, outlining_graph = False):
     # Base square unit (the 4 corners of a hinge/tip)
     unit_square = 2*np.array([[1.0, 0.0, -1.0],
                             [1.0, 0.0, 1.0],
@@ -448,6 +448,37 @@ def letter_w(filling_points_per_seg = 50):
     nominal_configs = {"nominal_config_bar": merged_config_bar,
                        "nominal_config_V": merged_config_V,
                        "nominal_config_W": merged_config_W}
+    
+    # if outlining_graph is true, then also return adjacency matrix of the tips and hinges only
+    if outlining_graph:
+        num_total_nodes = merged_config_W.shape[1]
+        adj_matrix = np.zeros((num_total_nodes, num_total_nodes), dtype=int)
+
+        # Iterate through each segment (cluster) to outline it
+        for idxs in cluster_indices:
+            # In every cluster:
+            # The first 'num_interfacing_pts' (4) are the start hinge/tip nodes
+            # The last 'num_interfacing_pts' (4) are the end hinge/tip nodes
+            start_nodes = idxs[:num_interfacing_pts]
+            end_nodes = idxs[-num_interfacing_pts:]
+
+            # 1. Create Longitudinal edges (Start Corner -> End Corner)
+            for k in range(num_interfacing_pts):
+                u, v = start_nodes[k], end_nodes[k]
+                adj_matrix[u, v] = 1
+                adj_matrix[v, u] = 1
+
+            # 2. Create Cross-sectional edges (Outline the square faces)
+            # Based on unit_square order: 0->1->2->3->0 forms the perimeter
+            for corners in [start_nodes, end_nodes]:
+                for k in range(num_interfacing_pts):
+                    u = corners[k]
+                    v = corners[(k + 1) % num_interfacing_pts] # Wrap around 0-1, 1-2, 2-3, 3-0
+                    adj_matrix[u, v] = 1
+                    adj_matrix[v, u] = 1
+
+        return nominal_configs, cluster_indices, adj_matrix
+
     
     return nominal_configs, cluster_indices
 

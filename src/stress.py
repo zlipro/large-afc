@@ -41,7 +41,8 @@ def optimize_stress(nominal_config: np.ndarray, hyperparam_dict: dict, verbose=F
         ]
         
         prob = cp.Problem(obj, constraints)
-        prob.solve(solver=cp.SCS)
+        prob.solve(solver=cp.MOSEK)
+        # prob.solve(solver=cp.SCS)
 
         weights_optimal = weights.value
 
@@ -184,5 +185,23 @@ def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict
 
         return stress_mat_list
     
+
+def sparsity_truncation(sparse_tol: float, stress_mat: np.ndarray):
+    """
+
+    # truncate small stress weights to zero
+
+    """
+
+    stress_mat_trunc = stress_mat.copy()
+    stress_mat_trunc[np.abs(stress_mat_trunc) < sparse_tol] = 0
+
+    return stress_mat_trunc
+
+
+
+def quantizaiton_refinement():
+
+    pass
 
     

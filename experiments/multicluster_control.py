@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from src import stress
 from src.utils.utils import stress_normalizer
-from src.control import multicluster_afc_global, tracking_error
+from src.control import multicluster_afc_global, tracking_error, multicluster_afc_distributed
 import src.utils.geometry as geometry
 
 
@@ -48,10 +48,25 @@ if __name__ == "__main__":
         dt = 0.01
         ), 
         nominal_config_W)
+    
+    TE_multicluster_distributed = tracking_error(multicluster_afc_distributed(
+        nominal_config_W,
+        subgraph_glb_idx,
+        # leaders_glb_idx = np.random.choice(nominal_config.shape[1], 10, replace=False).tolist(),
+        leaders_glb_idx = [6,7,17,25,31,41,47,59],
+        stress_mat_list = stress_mat_list,
+        gain = 60,
+        max_itr = 10000,
+        dt = 0.01
+        ),
+        nominal_config_W)
+    
 
     print("Subgraph Global Indices:", subgraph_glb_idx)
     plt.figure()
     plt.plot(TE_multicluster)
+    plt.plot(TE_multicluster_distributed, linestyle='--')
+    plt.legend(["Multicluster AFC - Global", "Multicluster AFC - Distributed"])
     plt.title("Tracking Error - Multicluster AFC")
     plt.xlabel("Iteration")
     plt.ylabel("Tracking Error")
