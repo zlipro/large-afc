@@ -7,7 +7,7 @@ from .utils import generate_points_in_rect, stitch_clusters
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def circular_config(num_nodes, radius = 1):
+def circular_config(num_nodes, radius = 1, outlining_graph = False):
     """
     Generate positions of nodes placed evenly on a circle (regular polygon).
     
@@ -27,6 +27,13 @@ def circular_config(num_nodes, radius = 1):
     
     # Stack into a 2xN array
     positions = np.vstack((x_positions, y_positions))
+
+    if outlining_graph:
+        adj_matrix = np.zeros((num_nodes, num_nodes), dtype=int)
+        for i in range(num_nodes):
+            adj_matrix[i, (i + 1) % num_nodes] = 1
+            adj_matrix[(i + 1) % num_nodes, i] = 1
+        return positions, adj_matrix
     
     return positions
 
@@ -162,10 +169,170 @@ def truncated_icosahedron():
     return vertices, adj_matrix
 
 
-def nested_football():
+# def nested_football():
 
+#     """
+#     Generates 3 fused Truncated Icosahedra with WIDER separation (approx 116 degrees).
+#     """
+    
+#     # --- 1. Generate Base Unit (Head) ---
+#     phi = (1 + np.sqrt(5)) / 2
+#     base_seeds = [[0, 1, 3 * phi], [2, 1 + 2 * phi, phi], [1, 2 + phi, 2 * phi]]
+#     unique_verts = set()
+#     for base in base_seeds:
+#         perms = [(base[0], base[1], base[2]), (base[1], base[2], base[0]), (base[2], base[0], base[1])]
+#         for p in perms:
+#             for signs in product([-1, 1], repeat=3):
+#                 unique_verts.add((p[0]*signs[0], p[1]*signs[1], p[2]*signs[2]))
+#     verts_head = np.array(list(unique_verts))
+
+#     # --- 2. Identify Connectivity & Pentagons ---
+#     # Build Adjacency
+#     tree = KDTree(verts_head)
+#     pairs = tree.query_pairs(r=2.1)
+#     adj_list = {i: set() for i in range(len(verts_head))}
+#     for i, j in pairs:
+#         if abs(np.linalg.norm(verts_head[i] - verts_head[j]) - 2.0) < 0.1:
+#             adj_list[i].add(j)
+#             adj_list[j].add(i)
+
+#     # Find Pentagons (5-cycles)
+#     pentagon_centroids = []
+#     visited_paths = set()
+#     for i in range(len(verts_head)):
+#         for n in adj_list[i]:
+#             for a in adj_list[n]:
+#                 if a == i: continue
+#                 for b in adj_list[a]:
+#                     if b == n: continue
+#                     for c in adj_list[b]:
+#                         if c == a: continue
+#                         if i in adj_list[c]:
+#                             cycle = tuple(sorted([i, n, a, b, c]))
+#                             if cycle not in visited_paths:
+#                                 visited_paths.add(cycle)
+#                                 centroid = np.mean(verts_head[list(cycle)], axis=0)
+#                                 pentagon_centroids.append(centroid)
+
+#     # --- 3. Select WIDER Attachment Sites ---
+#     pL = pentagon_centroids[0]
+#     pR = None
+    
+#     # We look for the "Next-Nearest" Pentagon neighbors
+#     # Angle should be approx 116.57 degrees
+#     target_angle = 116.57
+    
+#     for cent in pentagon_centroids[1:]:
+#         dot = np.dot(pL, cent)
+#         norm_prod = np.linalg.norm(pL) * np.linalg.norm(cent)
+#         angle = np.degrees(np.arccos(np.clip(dot / norm_prod, -1, 1)))
+        
+#         if abs(angle - target_angle) < 2.0:
+#             pR = cent
+#             break
+            
+#     if pR is None: 
+#         raise ValueError(f"Could not find pentagons separated by {target_angle} degrees.")
+
+#     # --- 4. Robust Attachment Logic (Translate + Twist Check) ---
+#     def attach_ear(base_verts, face_centroid):
+#         trans_vec = 2.0 * face_centroid
+        
+#         # Candidate A: Direct Translation
+#         candidate_A = base_verts + trans_vec
+        
+#         # Candidate B: Twist 36 deg then Translate
+#         axis = face_centroid / np.linalg.norm(face_centroid)
+#         r_twist = R.from_rotvec(np.radians(36.0) * axis)
+#         candidate_B = r_twist.apply(base_verts) + trans_vec
+        
+#         # Check Interface Error (Distance to Head vertices)
+#         def get_err(cand):
+#             dists = np.linalg.norm(cand - face_centroid, axis=1)
+#             closest_idxs = np.where(dists < 0.5)[0] # Should be 5
+#             if len(closest_idxs) == 0: return float('inf')
+#             err = 0
+#             for idx in closest_idxs:
+#                 err += np.min(np.linalg.norm(verts_head - cand[idx], axis=1))
+#             return err
+
+#         return candidate_A if get_err(candidate_A) < get_err(candidate_B) else candidate_B
+
+#     verts_L = attach_ear(verts_head, pL)
+#     verts_R = attach_ear(verts_head, pR)
+
+#     # --- 5. Weld Vertices ---
+#     all_verts = np.vstack([verts_head, verts_L, verts_R])
+    
+#     # Filter duplicates using KDTree mask
+#     final_verts_list = []
+#     tree_all = KDTree(all_verts)
+#     processed = np.zeros(len(all_verts), dtype=bool)
+    
+#     for i in range(len(all_verts)):
+#         if processed[i]: continue
+#         final_verts_list.append(all_verts[i])
+#         # Mark neighbors within 0.1 distance as processed (duplicates)
+#         neighbors = tree_all.query_ball_point(all_verts[i], r=0.1)
+#         processed[neighbors] = True
+        
+#     final_verts = np.array(final_verts_list)
+#     # Expected: 170 vertices
+#     # print(f"Nodes: {len(final_verts)}")
+
+#     # --- 6. Orientation (Upright V-shape) ---
+#     c_L = np.mean(verts_L, axis=0)
+#     c_R = np.mean(verts_R, axis=0)
+    
+#     # Bisector Up
+#     v_up = (c_L + c_R) / 2.0
+#     v_up /= np.linalg.norm(v_up)
+    
+#     # Rotate Up to Z
+#     z_axis = np.array([0,0,1])
+#     rot_axis = np.cross(v_up, z_axis)
+#     if np.linalg.norm(rot_axis) > 1e-5:
+#         rot_angle = np.arccos(np.clip(np.dot(v_up, z_axis), -1, 1))
+#         r1 = R.from_rotvec(rot_angle * (rot_axis / np.linalg.norm(rot_axis)))
+#         final_verts = r1.apply(final_verts)
+#         c_R = r1.apply(c_R) # update R center for next step
+
+#     # Rotate so Ears are symmetric across YZ plane (Right ear at +X)
+#     angle_z = np.arctan2(c_R[1], c_R[0])
+#     # We want Right Ear to be at some angle? 
+#     # Actually, for a wide V, usually we want them in the XZ plane.
+#     # So we rotate -angle_z to bring R to the X axis?
+#     # No, if we bring R to X-axis, L will be at -X (symmetry).
+#     # Ideally, we want the V to lie flat in the XZ plane.
+#     # Current R has z > 0. We want y = 0.
+#     # So we rotate around Z to make y=0.
+#     r2 = R.from_rotvec(-angle_z * z_axis)
+#     final_verts = r2.apply(final_verts)
+    
+#     final_vertices = final_verts.T
+
+#     # --- 7. Adjacency Matrix ---
+#     num_v = final_vertices.shape[1]
+#     adj = np.zeros((num_v, num_v), dtype=int)
+    
+#     # Fast adjacency build
+#     for i in range(num_v):
+#         diffs = final_vertices.T[i+1:] - final_vertices.T[i]
+#         dists_sq = np.sum(diffs**2, axis=1)
+#         # 2.0^2 = 4.0
+#         neighbors_idx = np.where(np.abs(dists_sq - 4.0) < 0.2)[0]
+        
+#         true_j = neighbors_idx + (i + 1)
+#         adj[i, true_j] = 1
+#         adj[true_j, i] = 1
+            
+#     return final_vertices, adj
+
+def nested_football(outlining_graph = False):
     """
     Generates 3 fused Truncated Icosahedra with WIDER separation (approx 116 degrees).
+    Returns:
+        vertices (3xN), adjacency (NxN), cluster_indices (list of arrays)
     """
     
     # --- 1. Generate Base Unit (Head) ---
@@ -178,6 +345,7 @@ def nested_football():
             for signs in product([-1, 1], repeat=3):
                 unique_verts.add((p[0]*signs[0], p[1]*signs[1], p[2]*signs[2]))
     verts_head = np.array(list(unique_verts))
+    num_nodes_per_unit = len(verts_head) # Should be 60
 
     # --- 2. Identify Connectivity & Pentagons ---
     # Build Adjacency
@@ -210,9 +378,6 @@ def nested_football():
     # --- 3. Select WIDER Attachment Sites ---
     pL = pentagon_centroids[0]
     pR = None
-    
-    # We look for the "Next-Nearest" Pentagon neighbors
-    # Angle should be approx 116.57 degrees
     target_angle = 116.57
     
     for cent in pentagon_centroids[1:]:
@@ -239,10 +404,10 @@ def nested_football():
         r_twist = R.from_rotvec(np.radians(36.0) * axis)
         candidate_B = r_twist.apply(base_verts) + trans_vec
         
-        # Check Interface Error (Distance to Head vertices)
+        # Check Interface Error
         def get_err(cand):
             dists = np.linalg.norm(cand - face_centroid, axis=1)
-            closest_idxs = np.where(dists < 0.5)[0] # Should be 5
+            closest_idxs = np.where(dists < 0.5)[0] 
             if len(closest_idxs) == 0: return float('inf')
             err = 0
             for idx in closest_idxs:
@@ -254,24 +419,42 @@ def nested_football():
     verts_L = attach_ear(verts_head, pL)
     verts_R = attach_ear(verts_head, pR)
 
-    # --- 5. Weld Vertices ---
+    # --- 5. Weld Vertices & Track Indices ---
     all_verts = np.vstack([verts_head, verts_L, verts_R])
     
-    # Filter duplicates using KDTree mask
+    # Array to map every original vertex to its new final index
+    # Initialize with -1
+    mapping = np.full(len(all_verts), -1, dtype=int)
+    
     final_verts_list = []
     tree_all = KDTree(all_verts)
     processed = np.zeros(len(all_verts), dtype=bool)
     
+    current_final_idx = 0
+    
     for i in range(len(all_verts)):
         if processed[i]: continue
+        
         final_verts_list.append(all_verts[i])
-        # Mark neighbors within 0.1 distance as processed (duplicates)
+        
+        # Find duplicates (including self)
         neighbors = tree_all.query_ball_point(all_verts[i], r=0.1)
+        
+        # Mark all duplicates as processed and map them to the current final index
         processed[neighbors] = True
+        mapping[neighbors] = current_final_idx
+        
+        current_final_idx += 1
         
     final_verts = np.array(final_verts_list)
-    # Expected: 170 vertices
-    # print(f"Nodes: {len(final_verts)}")
+    
+    # Retrieve indices for each cluster based on original ranges
+    # Head: 0 to 60, Left: 60 to 120, Right: 120 to 180
+    idx_head = np.unique(mapping[0 : num_nodes_per_unit])
+    idx_L    = np.unique(mapping[num_nodes_per_unit : 2*num_nodes_per_unit])
+    idx_R    = np.unique(mapping[2*num_nodes_per_unit : 3*num_nodes_per_unit])
+    
+    cluster_indices = [idx_head, idx_L, idx_R]
 
     # --- 6. Orientation (Upright V-shape) ---
     c_L = np.mean(verts_L, axis=0)
@@ -288,17 +471,10 @@ def nested_football():
         rot_angle = np.arccos(np.clip(np.dot(v_up, z_axis), -1, 1))
         r1 = R.from_rotvec(rot_angle * (rot_axis / np.linalg.norm(rot_axis)))
         final_verts = r1.apply(final_verts)
-        c_R = r1.apply(c_R) # update R center for next step
+        c_R = r1.apply(c_R)
 
-    # Rotate so Ears are symmetric across YZ plane (Right ear at +X)
+    # Rotate so Ears are symmetric across YZ plane
     angle_z = np.arctan2(c_R[1], c_R[0])
-    # We want Right Ear to be at some angle? 
-    # Actually, for a wide V, usually we want them in the XZ plane.
-    # So we rotate -angle_z to bring R to the X axis?
-    # No, if we bring R to X-axis, L will be at -X (symmetry).
-    # Ideally, we want the V to lie flat in the XZ plane.
-    # Current R has z > 0. We want y = 0.
-    # So we rotate around Z to make y=0.
     r2 = R.from_rotvec(-angle_z * z_axis)
     final_verts = r2.apply(final_verts)
     
@@ -308,19 +484,17 @@ def nested_football():
     num_v = final_vertices.shape[1]
     adj = np.zeros((num_v, num_v), dtype=int)
     
-    # Fast adjacency build
     for i in range(num_v):
         diffs = final_vertices.T[i+1:] - final_vertices.T[i]
         dists_sq = np.sum(diffs**2, axis=1)
-        # 2.0^2 = 4.0
         neighbors_idx = np.where(np.abs(dists_sq - 4.0) < 0.2)[0]
         
         true_j = neighbors_idx + (i + 1)
         adj[i, true_j] = 1
         adj[true_j, i] = 1
-            
-    return final_vertices, adj
-
+    if outlining_graph:
+        return final_vertices, cluster_indices, adj
+    return final_vertices, cluster_indices
 
 
 def letter_w(filling_points_per_seg = 50, outlining_graph = False):

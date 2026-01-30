@@ -141,7 +141,7 @@ class Graph:
                 x_values = [node_pos[0, edge[0]], node_pos[0, edge[1]]]
                 y_values = [node_pos[1, edge[0]], node_pos[1, edge[1]]]
                 z_values = [node_pos[2, edge[0]], node_pos[2, edge[1]]]
-                ax.plot(x_values, y_values, z_values, color=edge_color, zorder=1)
+                ax.plot(x_values, y_values, z_values, color=edge_color, zorder=1, linewidth=linewidth)
 
             ax.scatter(node_pos[0, :], node_pos[1, :], node_pos[2, :], color=node_color, s=node_size, zorder=2)
     
