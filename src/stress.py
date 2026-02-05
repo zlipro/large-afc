@@ -138,6 +138,112 @@ def optimized_stress_symm(nominal_config: np.ndarray, hyperparam_dict: dict, ver
     
     return stress_mat
 
+def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict, verbose=False):
+    """
+    Optimized Symmetric Stress (Fast Version).
+    Speedup obtained by pre-reducing constraints and objective to size K (groups)
+    instead of M (edges).
+    """
+    D, N = nominal_config.shape
+    
+    # 1. Setup & Symmetry Detection
+    incidence_full = incidence_matrix_fully_connected(N)
+    S_map, unique_dists = get_symmetry_mapping_matrix(nominal_config)
+    K_groups = S_map.shape[1]
+    
+    if verbose:
+        print(f"USI Method: Collapsing {S_map.shape[0]} edges -> {K_groups} groups.")
+
+    # 2. Pre-compute Geometry (Standard)
+    augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
+    U, _, _ = np.linalg.svd(augmented_config)
+    Q = U[:, D+1:]
+    
+    Psi = Q.T @ incidence_full
+    phi = np.diag(Psi.T @ Psi)
+    
+    # 3. --- CRITICAL OPTIMIZATION START ---
+    
+    # A. Objective Reduction
+    # Instead of norm(S @ w_reduced, 1), we use a weighted L1 norm of w_reduced.
+    # Because groups are disjoint, ||w||_1 = sum(|w_k| * count_of_edges_in_group_k)
+    group_counts = np.sum(S_map, axis=0) # Shape (K,)
+    
+    # Reduced linear term: phi^T @ S
+    phi_reduced = phi @ S_map # Shape (K,)
+
+    # B. Equilibrium Constraint Reduction
+    # Old: E_full (huge) @ S @ w_red
+    # New: E_reduced (smaller) @ w_red
+    E_full = np.vstack([augmented_config.T @ incidence_full @ np.diag(incidence_full.T[:, n]) for n in range(N)])
+    E_reduced = E_full @ S_map # Shape (Constraints, K)
+
+    # C. PSD & Spectral Constraint Matrix Pre-calculation
+    # We pre-calculate the "Basis Matrices" for each group. 
+    # M_k = Sum of matrices for all edges in group k
+    
+    # For PSD: P_k = Psi * diag(col_k of S) * Psi.T
+    PSD_matrices = []
+    # For Spectral: L_k = B * diag(col_k of S) * B.T
+    Spectral_matrices = []
+    
+    for k in range(K_groups):
+        # Extract the column as a diagonal mask (much faster than full matrix mult)
+        # S_map[:, k] is a binary vector indicating which edges belong to group k
+        edge_mask = S_map[:, k]
+        
+        # Reduced PSD term for this group
+        # Corresponds to: Psi @ diag(edge_mask) @ Psi.T
+        # Optimization: We only select columns of Psi where edge_mask is 1
+        Psi_k = Psi[:, edge_mask > 0.5] 
+        P_k = Psi_k @ Psi_k.T
+        PSD_matrices.append(P_k)
+        
+        # Reduced Laplacian term for this group
+        # Corresponds to: Inc @ diag(edge_mask) @ Inc.T
+        Inc_k = incidence_full[:, edge_mask > 0.5]
+        L_k = Inc_k @ Inc_k.T
+        Spectral_matrices.append(L_k)
+
+    # 4. --- CONVEX OPTIMIZATION (Tiny Problem Size) ---
+    
+    reduced_weights = cp.Variable(K_groups)
+    
+    # Objective: Weighted L1 norm - reduced linear term
+    # Note: cp.multiply does element-wise mult
+    obj_term_1 = cp.sum(cp.multiply(group_counts, cp.abs(reduced_weights)))
+    obj_term_2 = hyperparam_dict['alpha'] * (phi_reduced @ reduced_weights)
+    obj = cp.Minimize(obj_term_1 - obj_term_2)
+    
+    constraints = [
+        # Equilibrium: Simple matrix mult (Constraints x K)
+        E_reduced @ reduced_weights == 0,
+        
+        # PSD: Sum of K matrices (N-D-1 x N-D-1)
+        cp.sum([reduced_weights[k] * PSD_matrices[k] for k in range(K_groups)]) 
+            - hyperparam_dict['gamma'] * np.eye(N - D - 1) >> 0,
+            
+        # Spectral: Sum of K matrices (N x N)
+        cp.norm(cp.sum([reduced_weights[k] * Spectral_matrices[k] for k in range(K_groups)]), 2) 
+            <= hyperparam_dict['beta']
+    ]
+    
+    prob = cp.Problem(obj, constraints)
+    
+    # Use MOSEK if available, otherwise SCS
+    # MOSEK is vastly superior for these "Sum of terms" SDPs
+    prob.solve(solver=cp.MOSEK if 'MOSEK' in cp.installed_solvers() else cp.SCS, verbose=verbose)
+
+    if prob.status not in ["optimal", "optimal_inaccurate"]:
+        if verbose: print(f"Warning: Problem status {prob.status}")
+        return None
+
+    # Recover full weights for output
+    w_reduced_opt = reduced_weights.value
+    weights_optimal = S_map @ w_reduced_opt
+    
+    stress_mat = incidence_full @ np.diag(weights_optimal) @ incidence_full.T
+    return stress_mat
 
 def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict, parallel=True):
     """
@@ -149,7 +255,6 @@ def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict
         stress_mat_list = []
         for subgraph in subgraph_glb_idx:
             nominal_subconfig = target_config[:, subgraph]
-
             stress_mat = optimize_stress(nominal_subconfig, hyperparam_dict)
             stress_mat_list.append(stress_mat)
         return stress_mat_list

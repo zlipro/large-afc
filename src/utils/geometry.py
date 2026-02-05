@@ -55,7 +55,7 @@ def random_config(N, D = 2, playground_size = 4):
     """
     return np.random.rand(D, N) * playground_size
 
-def cuboctahedron():
+def cuboctahedron(outlining_graph = False):
     """
     Generate positions of nodes placed at the vertices of a cuboctahedron.
     
@@ -76,26 +76,27 @@ def cuboctahedron():
         [0, -1, 1],
         [0, -1, -1]
     ]).T  # Transpose to get shape (3, 12)
+    if outlining_graph:
+        # a fake graph just for visualization purposes
+        # Initialize the adjacency matrix
+        num_vertices = vertices.shape[1]
+        adj_matrix = np.zeros((num_vertices, num_vertices), dtype=int)
 
-    # a fake graph just for visualization purposes
-    # Initialize the adjacency matrix
-    num_vertices = vertices.shape[1]
-    adj_matrix = np.zeros((num_vertices, num_vertices), dtype=int)
-
-    # Calculate Euclidean distances to find edges
-    # In this coordinate set, edges exist where distance is exactly sqrt(2)
-    for i in range(num_vertices):
-        for j in range(i + 1, num_vertices):
-            dist = np.linalg.norm(vertices[:, i] - vertices[:, j])
-            if np.isclose(dist, np.sqrt(2)):
-                adj_matrix[i, j] = 1
-                adj_matrix[j, i] = 1
-                
-    return vertices, adj_matrix
+        # Calculate Euclidean distances to find edges
+        # In this coordinate set, edges exist where distance is exactly sqrt(2)
+        for i in range(num_vertices):
+            for j in range(i + 1, num_vertices):
+                dist = np.linalg.norm(vertices[:, i] - vertices[:, j])
+                if np.isclose(dist, np.sqrt(2)):
+                    adj_matrix[i, j] = 1
+                    adj_matrix[j, i] = 1
+    
+        return vertices, adj_matrix
+    return vertices
 
 
 
-def truncated_icosahedron():
+def truncated_icosahedron(outlining_graph = False):
     """
     Generate positions and the adjacency matrix for a truncated icosahedron.
     
@@ -143,30 +144,32 @@ def truncated_icosahedron():
     # Transpose to 3x60 as requested
     vertices = vertices.T
 
-    # --- Generate Adjacency Matrix ---
-    # With these coordinates, edge length is exactly 2.0
-    num_vertices = 60
-    adj_matrix = np.zeros((num_vertices, num_vertices), dtype=int)
-    
-    target_edge_length = 2.0
-    tolerance = 1e-4
+    if outlining_graph:
+        # --- Generate Adjacency Matrix ---
+        # With these coordinates, edge length is exactly 2.0
+        num_vertices = 60
+        adj_matrix = np.zeros((num_vertices, num_vertices), dtype=int)
+        
+        target_edge_length = 2.0
+        tolerance = 1e-4
 
-    # Calculate upper triangle of distance matrix
-    for i in range(num_vertices):
-        for j in range(i + 1, num_vertices):
-            # dist = sqrt((x1-x2)^2 + ...)
-            dist = np.linalg.norm(vertices[:, i] - vertices[:, j])
-            
-            if abs(dist - target_edge_length) < tolerance:
-                adj_matrix[i, j] = 1
-                adj_matrix[j, i] = 1
-    
-    # Validation: Every node must have exactly degree 3
-    degrees = np.sum(adj_matrix, axis=0)
-    if not np.all(degrees == 3):
-        print(f"Warning: Not all vertices have degree 3. Degrees found: {np.unique(degrees)}")
+        # Calculate upper triangle of distance matrix
+        for i in range(num_vertices):
+            for j in range(i + 1, num_vertices):
+                # dist = sqrt((x1-x2)^2 + ...)
+                dist = np.linalg.norm(vertices[:, i] - vertices[:, j])
+                
+                if abs(dist - target_edge_length) < tolerance:
+                    adj_matrix[i, j] = 1
+                    adj_matrix[j, i] = 1
+        
+        # Validation: Every node must have exactly degree 3
+        degrees = np.sum(adj_matrix, axis=0)
+        if not np.all(degrees == 3):
+            print(f"Warning: Not all vertices have degree 3. Degrees found: {np.unique(degrees)}")
 
-    return vertices, adj_matrix
+        return vertices, adj_matrix
+    return vertices
 
 def nested_football(outlining_graph = False):
     """
@@ -320,21 +323,34 @@ def nested_football(outlining_graph = False):
     
     final_vertices = final_verts.T
 
-    # --- 7. Adjacency Matrix ---
-    num_v = final_vertices.shape[1]
-    adj = np.zeros((num_v, num_v), dtype=int)
+    # # --- 7. Adjacency Matrix ---
+    # num_v = final_vertices.shape[1]
+    # adj = np.zeros((num_v, num_v), dtype=int)
     
-    for i in range(num_v):
-        diffs = final_vertices.T[i+1:] - final_vertices.T[i]
-        dists_sq = np.sum(diffs**2, axis=1)
-        neighbors_idx = np.where(np.abs(dists_sq - 4.0) < 0.2)[0]
+    # for i in range(num_v):
+    #     diffs = final_vertices.T[i+1:] - final_vertices.T[i]
+    #     dists_sq = np.sum(diffs**2, axis=1)
+    #     neighbors_idx = np.where(np.abs(dists_sq - 4.0) < 0.2)[0]
         
-        true_j = neighbors_idx + (i + 1)
-        adj[i, true_j] = 1
-        adj[true_j, i] = 1
+    #     true_j = neighbors_idx + (i + 1)
+    #     adj[i, true_j] = 1
+    #     adj[true_j, i] = 1
+    # if outlining_graph:
+    #     return final_vertices, cluster_indices, adj
+    # return final_vertices, cluster_indices
+    # --- Index Mapping (Without np.unique) ---
+    idx_head = mapping[0 : num_nodes_per_unit]
+    idx_L    = mapping[num_nodes_per_unit : 2*num_nodes_per_unit]
+    idx_R    = mapping[2*num_nodes_per_unit : 3*num_nodes_per_unit]
+    
+    cluster_indices = [idx_head.tolist(), idx_L.tolist(), idx_R.tolist()]
+
     if outlining_graph:
+        # If you need adjacency, ensure 'adj' is calculated before this
         return final_vertices, cluster_indices, adj
+        
     return final_vertices, cluster_indices
+    
 
 
 def letter_w(filling_points_per_seg = 50, outlining_graph = False):

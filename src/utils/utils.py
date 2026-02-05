@@ -25,26 +25,32 @@ def incidence_matrix_fully_connected(n):
         
         return inc_mat
 
-def detect_num_edges(stress_mat, sparse_tol = 1e-5):
+def detect_num_edges(stress_mat, sparse_tol=1e-5):
     """
-    Detects the number of edges in a stress matrix based on non-zero entries.
+    Detects the number of edges based on non-zero entries.
+    Handles both single matrices and lists of matrices (Multi-Cluster).
 
     Args:
-        stress_mat (np.ndarray): The stress matrix of shape (N, N).
+        stress_mat (np.ndarray or list): A single (N, N) matrix OR a list of matrices.
         sparse_tol (float): Tolerance below which weights are considered zero.
 
     Returns:
-        int: The number of edges detected in the stress matrix.
+        int: The total number of edges detected.
     """
-    N = stress_mat.shape[0]
-    edge_count = 0
+    # 1. Handle Multi-Cluster Input (List of Matrices)
+    if isinstance(stress_mat, list):
+        total_edges = 0
+        for mat in stress_mat:
+            if mat is not None:
+                total_edges += detect_num_edges(mat, sparse_tol)
+        return total_edges
 
-    for i in range(N):
-        for j in range(i + 1, N):
-            if abs(stress_mat[i, j]) > sparse_tol:
-                edge_count += 1
+    # Fast Vectorized Counting (replaces slow nested loops)
+    # We take the Upper Triangle (k=1) to avoid double counting and diagonal
+    upper_tri = np.triu(stress_mat, k=1)
+    edge_count = np.sum(np.abs(upper_tri) > sparse_tol)
 
-    return edge_count
+    return int(edge_count)
 
 def stress_normalizer(stress_mat):
     """
@@ -189,3 +195,45 @@ def get_symmetry_mapping_matrix(config, tol=1e-4):
         S[indices, k_idx] = 1.0
         
     return S, unique_vals
+
+def random_multicluster_indices(num_nodes, num_clusters, node_per_cluster):
+    """
+    Generates cluster indices that are random but GUARANTEE every node 
+    is included in at least one cluster.
+    """
+    if node_per_cluster * num_clusters < num_nodes:
+        raise ValueError("Total capacity (clusters * size) must be >= num_nodes to guarantee coverage.")
+
+    # 1. Create a random permutation of all nodes
+    # This ensures we have a random order, but we possess every ID from 0 to N-1
+    shuffled_nodes = np.random.permutation(num_nodes)
+    
+    # 2. Distribute the 'must-have' nodes first
+    # We split the shuffled list into roughly equal 'core' chunks for each cluster
+    core_chunks = np.array_split(shuffled_nodes, num_clusters)
+    
+    subgraph_glb_idx = []
+    
+    for i in range(num_clusters):
+        core = core_chunks[i]
+        current_len = len(core)
+        needed = node_per_cluster - current_len
+        
+        # 3. Fill the rest of the cluster with random neighbors
+        # We sample from ALL nodes excluding the ones we already have in the core
+        # (Or just sample from all nodes and use np.unique, which is easier)
+        
+        remaining_pool = np.setdiff1d(np.arange(num_nodes), core)
+        
+        # Randomly pick extra nodes to meet the size requirement
+        if needed > 0:
+            extras = np.random.choice(remaining_pool, size=needed, replace=False)
+            full_cluster = np.concatenate([core, extras])
+        else:
+            full_cluster = core
+            
+        # Sort for consistency
+        full_cluster.sort()
+        subgraph_glb_idx.append(full_cluster.tolist())
+
+    return subgraph_glb_idx

@@ -1,0 +1,51 @@
+experiment:
+  name: "benchmark-random-500"
+  total_runs: 10           # How many random cases to simulate
+  dim: 2                  # Dimension of the geometry
+  output_dir: "results/stress_mats"
+
+geometry:
+  type: "random"       # Options: circular, random
+  num_nodes: 500
+  radius: 5.0
+
+custom_algs:
+  custom_generic: false
+  custom_usi: false
+  custom_mc: true
+
+custom_mc_params:
+  num_clusters: 10
+  node_per_cluster: 60
+
+# Custom Algorithm Hyperparameters
+opt_hyperparam_set_1:
+  alpha: 0.5
+  beta: 1.0
+  gamma: 0.1
+
+opt_hyperparam_set_2:
+  alpha: 1.0
+  beta: 1
+  gamma: 0.1
+
+opt_hyperparam_set_3:
+  alpha: 5
+  beta: 1
+  gamma: 0.1
+
+# Toggle which comparisons to run (useful if one is slow or broken)
+baselines:
+  yang2019: true
+  xiao2022: false    
+  li2026: true
+  lin2016: false
+
+evaluation:
+  # Where the .npy files are located
+  input_dir: "results/stress_mats"
+  
+  # Where to save the plots
+  output_dir: "results/benchmark-plots"
+
+  sparse_tol: 1e-5       # Tolerance for counting edges

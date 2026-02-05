@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", message=".*Argument sub[ij] in putaijlist64.*"
 import src.utils.geometry as geometry
 from src import stress
 from src.sota import yang2019, xiao2022, li2026, lin2016
-from src.utils.utils import incidence_matrix_fully_connected
+from src.utils.utils import incidence_matrix_fully_connected, find_global_stress_mat, random_multicluster_indices
 
 def load_config(config_path):
     with open(config_path, 'r') as file:
@@ -31,11 +31,21 @@ def run_case(cfg, run_id, solver_obj=None):
     
     # --- Setup Geometry ---
     np.random.seed(run_id) 
-    
-    num_nodes = int(cfg['geometry']['num_nodes'])
-    playground_size = float(cfg['geometry']['radius'])
-    
-    nominal_config = geometry.random_config(num_nodes, playground_size = playground_size)
+
+    if cfg['geometry']['type'] == 'circular':
+        num_nodes = int(cfg['geometry']['num_nodes'])
+        playground_size = float(cfg['geometry']['radius'])
+        nominal_config = geometry.circular_config(num_nodes, radius=playground_size)
+    elif cfg['geometry']['type'] == 'random':   
+        num_nodes = int(cfg['geometry']['num_nodes'])
+        playground_size = float(cfg['geometry']['radius'])
+        nominal_config = geometry.random_config(num_nodes, playground_size = playground_size)
+    elif cfg['geometry']['type'] == 'cuboctahedron':
+        nominal_config = geometry.cuboctahedron()
+        num_nodes = nominal_config.shape[1]
+    elif cfg['geometry']['type'] == 'truncated-icosahedron':
+        nominal_config = geometry.truncated_icosahedron()
+        num_nodes = nominal_config.shape[1]
 
     # Initialize results structure
     results = {
@@ -64,11 +74,11 @@ def run_case(cfg, run_id, solver_obj=None):
     if custom_algs.get('custom_usi'):
         hparams = cfg.get('opt_hyperparam_set_2')     # use a generic hyperparam set
         if hparams is not None:
-            # print(f"    > Running Proposed-USI...")
-            t0 = time.perf_counter()
-            my_stress = stress.optimized_stress_symm(nominal_config, hparams)
-            t1 = time.perf_counter()
             
+            t0 = time.perf_counter()
+            my_stress = stress.optimized_stress_symm_acc(nominal_config, hparams)
+            t1 = time.perf_counter()
+
             results['stress_matrices']['custom_usi'] = my_stress
             results['runtimes']['custom_usi'] = t1 - t0
     if custom_algs.get('custom_mc'):
@@ -77,20 +87,27 @@ def run_case(cfg, run_id, solver_obj=None):
             # print(f"    > Running Proposed-MC...")
             num_clusters = cfg.get('custom_mc_params').get('num_clusters')
             node_per_cluster = cfg.get('custom_mc_params').get('node_per_cluster')
-            subgraph_glb_idx = []
-            for _ in range(num_clusters):
-                # Sample unique indices without replacement
-                indices = np.random.choice(num_nodes, size=node_per_cluster, replace=False) 
-                # print(node_per_cluster)
-                # print(indices)
-                subgraph_glb_idx.append(indices.tolist())
+            if cfg['geometry']['type'] == 'random':   
+                subgraph_glb_idx = random_multicluster_indices(num_nodes, num_clusters, node_per_cluster)
+
+                
+            # print(f"        > Subgraph Indices: {subgraph_glb_idx}")
             t0 = time.perf_counter()
             my_stress = stress.compute_stress_multicluster(nominal_config, 
                                                            subgraph_glb_idx=subgraph_glb_idx, 
                                                            hyperparam_dict=hparams, 
-                                                           parallel=True) 
+                                                           parallel=False) 
             t1 = time.perf_counter()
-            
+            my_stress_global = find_global_stress_mat(my_stress, subgraph_glb_idx, num_nodes)
+
+            # # print the first 5 eigenvalues of the global stress matrix
+            # eigvals = np.linalg.eigvals(my_stress_global)
+            # eigvals = np.sort(np.real(eigvals))
+            # print(f"        > First 5 Eigenvalues of Global MC Stress Matrix: {eigvals[:5]}")
+
+
+            # Store the consolidated global matrix (useful for eigenvalue analysis)
+            results['stress_matrices']['custom_mc_global'] = my_stress_global
             results['stress_matrices']['custom_mc'] = my_stress
             results['runtimes']['custom_mc'] = t1 - t0
 
@@ -194,7 +211,7 @@ if __name__ == "__main__":
     for algo in ['custom_generic', 'custom_usi', 'custom_mc', 'yang2019', 'li2026', 'lin2016', 'xiao2022']:
         if cfg['baselines'].get(algo, False) or cfg['custom_algs'].get(algo, False):
             print(f"  - {algo}")
-    print(f"Total Runs: {total_runs} | Nodes: {cfg['geometry']['num_nodes']}")
+    print(f"Total Runs: {total_runs}" + (f" | Nodes: {cfg['geometry']['num_nodes']}" if 'num_nodes' in cfg['geometry'] else ""))
     print("-" * 70)
 
     if cfg['baselines'].get('xiao2022'):

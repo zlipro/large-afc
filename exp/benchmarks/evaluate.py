@@ -95,7 +95,7 @@ def eval_edge_count(raw_data, sparse_tol=1e-5):
     stats = df.groupby('Algorithm')['Edge Count'].agg(['mean', 'std', 'min', 'max'])
     print(stats)
 
-def eval_eigs(raw_data, dim, sparse_tol=1e-5):
+def eval_eigs(raw_data, dim):
     """
     Extracts eigenvalues, prints statistics for:
       1. The smallest non-zero eigenvalue (D+2-th)
@@ -108,26 +108,36 @@ def eval_eigs(raw_data, dim, sparse_tol=1e-5):
     for case in raw_data:
         if 'stress_matrices' in case:
             for algo_name, stress_mat in case['stress_matrices'].items():
-                if stress_mat is not None:
-                    try:
-                        # Normalize to ensure fair comparison (usually sets max eig to 1)
-                        stress_mat = stress_normalizer(stress_mat)
-                        
-                        # Compute and sort eigenvalues (Real parts only for symmetric matrices)
-                        eigvals = np.linalg.eigvals(stress_mat)
-                        eigvals = np.sort(np.real(eigvals)) # Ensure real and sorted
+                if stress_mat is None:
+                    continue
+                
+                # KEY CHANGE: specific check for MC lists
+                if isinstance(stress_mat, list):
+                    # We skip the list version because we expect a separate key 
+                    # (e.g., 'custom_mc_global') containing the combined matrix.
+                    continue
 
-                        val_d2 = eigvals[dim + 1] # The (D+2)-th smallest       
-                        val_max = eigvals[-1]     # The largest
 
-                        records.append({
-                            'Algorithm': algo_name,
-                            'Eigenvalues': eigvals,
-                            'lambda_(d+2)': val_d2,
-                            'lambda_max': val_max
-                        })
-                    except Exception as e:
-                        print(f"[Warn] Eig calc failed for {algo_name}: {e}")
+                try:
+                    
+                    # Normalize to ensure fair comparison (usually sets max eig to 1)
+                    stress_mat = stress_normalizer(stress_mat)
+                    
+                    # Compute and sort eigenvalues (Real parts only for symmetric matrices)
+                    eigvals = np.linalg.eigvals(stress_mat)
+                    eigvals = np.sort(np.real(eigvals)) # Ensure real and sorted
+
+                    val_d2 = eigvals[dim + 1] # The (D+2)-th smallest       
+                    val_max = eigvals[-1]     # The largest
+
+                    records.append({
+                        'Algorithm': algo_name,
+                        'Eigenvalues': eigvals,
+                        'lambda_(d+2)': val_d2,
+                        'lambda_max': val_max
+                    })
+                except Exception as e:
+                    print(f"[Warn] Eig calc failed for {algo_name}: {e}")
 
     if not records:
         print("[Warn] No eigenvalue data found.")
@@ -166,4 +176,4 @@ if __name__ == "__main__":
     raw_data = load_benchmark_data(input_dir, keywords)
     eval_runtime(raw_data)
     eval_edge_count(raw_data, sparse_tol=cfg['experiment'].get('sparse_tol', 1e-5))
-    eval_eigs(raw_data, cfg['experiment']['dim'], sparse_tol=cfg['experiment'].get('sparse_tol', 1e-5))
+    eval_eigs(raw_data, cfg['experiment']['dim'])

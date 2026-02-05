@@ -1,0 +1,32 @@
+experiment:
+  name: "benchmark-trunc-icosahedron-linked"
+  total_runs: 10         
+  dim: 3                  # Dimension of the geometry
+  output_dir: "results/stress_mats"
+
+geometry:
+  type: "truncated-icosahedron-linked"       # Options: circular, random
+
+custom_algs:
+  custom_mc: true
+
+opt_hyperparam_set:
+  alpha: 1.0
+  beta: 1
+  gamma: 0.1
+
+# Toggle which comparisons to run (useful if one is slow or broken)
+baselines:
+  yang2019: true
+  xiao2022: false    
+  li2026: true
+  lin2016: true
+
+evaluation:
+  # Where the .npy files are located
+  input_dir: "results/stress_mats"
+  
+  # Where to save the plots
+  output_dir: "results/benchmark-plots"
+
+  sparse_tol: 1e-5       # Tolerance for counting edges
