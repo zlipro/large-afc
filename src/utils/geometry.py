@@ -401,7 +401,7 @@ def letter_w(filling_points_per_seg = 50, outlining_graph = False):
         # Check Cluster 4 vs Cluster 3
         assert np.allclose(clusters_4, clusters_3 + translation_vector), "Cluster 4 is not a translation of Cluster 3"
         
-        print("Assertion Passed: All clusters are identical up to a translation of [0, 5, 0].")
+        # print("Assertion Passed: All clusters are identical up to a translation of [0, 5, 0].")
 
     except AssertionError as e:
         print(f"Assertion Failed: {e}")
@@ -473,6 +473,28 @@ def letter_w(filling_points_per_seg = 50, outlining_graph = False):
     merged_config_bar, cluster_indices = stitch_clusters(config_bar, num_interfacing_pts)
     merged_config_V, _ = stitch_clusters(config_V, num_interfacing_pts)
     merged_config_W, _ = stitch_clusters(config_W, num_interfacing_pts)
+
+
+    # ---------------fine tuning the geometry---------------------
+    # apply slight scaling on the y axis to strech a bit
+    scaling_matrix = np.array([[2, 0, 0],
+                               [0.0, 2.0, 0],
+                               [0.0, 0, 1.5]])
+    merged_config_bar = scaling_matrix @ merged_config_bar
+
+    # flip V upside down
+    flip_matrix = np.array([[2.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0],
+                            [0.0, 0.0, -1.0]])
+    
+    merged_config_V = flip_matrix @ merged_config_V
+
+    scaling_matrix = np.array([[2, 0, 0],
+                               [0.0, 1.5, 0],
+                               [0.0, 0, 1.5]])
+    merged_config_W = scaling_matrix @ merged_config_W
+   
+    # ---------------------------------------------------------------
 
 
     nominal_configs = {"nominal_config_bar": merged_config_bar,

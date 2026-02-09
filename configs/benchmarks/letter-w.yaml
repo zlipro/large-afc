@@ -5,7 +5,7 @@ experiment:
   output_dir: "results/stress_mats"
 
 geometry:
-  type: "letter-w"       # Options: circular, random
+  type: "letter-w"       
   filling_points_per_seg: 60  # Number of filling points per segment in the letter W geometry
 
 custom_algs:

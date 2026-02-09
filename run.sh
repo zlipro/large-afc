@@ -11,7 +11,7 @@ function show_help {
     echo ""
     echo "Options:"
     echo "  (No arguments) Defaults to -demo"
-    echo "  -demo          Run the visualization demo"
+    echo "  -demo          Run the large-AFC demo using the letter-w geometry"
     echo "  -benchmark     Run ALL benchmark cases (Default)"
     echo "  -benchmark random-5   Run ONLY random-5 case"
     echo "  -benchmark random-8   Run ONLY random-8 case"
@@ -35,6 +35,7 @@ function show_help {
     echo "  -evaluate trunc-icosahedron-linked     Run evaluation ONLY truncated icosahedron linked case"
     echo "  -evaluate letter-w     Run evaluation ONLY letter-w case"
     echo "  -all           Run everything (All Benchmarks -> Evaluate)"
+    echo "  -edm           Run the EDM vs USI stress comparison script"
     echo "  -help          Show this message"
     echo ""
 }
@@ -54,6 +55,8 @@ RUN_BENCH_CUBOCTAHEDRON=false
 RUN_BENCH_TRUNC_ICOSAHEDRON=false
 RUN_BENCH_TRUNC_ICOSAHEDRON_LINKED=false
 RUN_BENCH_LETTER_W=false
+
+RUN_EDM = false
 
 # Evaluation specific flags
 RUN_EVAL_RANDOM_5=false
@@ -218,8 +221,15 @@ else
                 RUN_EVAL_TRUNC_ICOSAHEDRON_LINKED=true
                 RUN_EVAL_LETTER_W=true
                 ;;
+
+            -edm)
+                RUN_EDM=true
+                shift # Consume the specific argument "edm"
+                ;;
                 
             -help) show_help; exit 0 ;;
+
+
             *) echo "Unknown parameter passed: $1"; exit 1 ;;
         esac
         shift # Move to next argument
@@ -230,11 +240,9 @@ fi
 
 if [ "$RUN_DEMO" = true ]; then
     echo "================================================================"
-    echo "Running DEMO: Plot Geometries"
+    echo "Running DEMO: Multicluster AFC with Letter W Geometry"
     echo "================================================================"
-    python experiments/plot_geometries.py
-    echo ""
-    echo "Finished at: $(date)"  # Prints the current system date and time
+    python demo.py --config configs/demo.yaml   
     echo ""
 fi
 
@@ -425,6 +433,15 @@ if [ "$RUN_EVAL_LETTER_W" = true ]; then
     echo "Running EVALUATION: Letter W Stats & Plots"
     echo "================================================================"
     python exp/benchmarks/evaluate.py --config configs/benchmarks/letter-w.yaml
+    echo ""
+fi
+
+
+if [ "$RUN_EDM" = true ]; then
+    echo "================================================================"
+    echo "Running EDM vs USI Stress Comparison"
+    echo "================================================================"
+    python exp/sim_edm_usi.py
     echo ""
 fi
 echo "All scripts Executed."
