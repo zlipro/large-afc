@@ -21,7 +21,7 @@ opt_hyperparam_set_1:
   gamma: 0.1
 
 opt_hyperparam_set_2:
-  alpha: 1.0
+  alpha: 1.5
   beta: 1
   gamma: 0.1
 
@@ -30,7 +30,7 @@ opt_hyperparam_set_3:
   beta: 1
   gamma: 0.1
 
-# Toggle which comparisons to run (useful if one is slow or broken)
+# Toggle which comparisons to run 
 baselines:
   yang2019: true
   xiao2022: true    
@@ -45,3 +45,30 @@ evaluation:
   output_dir: "results/benchmark-plots"
 
   sparse_tol: 1e-5       # Tolerance for counting edges
+
+  line_colors:
+    # MATCH EXACTLY with python script outputs
+    custom_1: "#069AF3"
+    custom_2: "orchid"
+    custom_3: "yellowgreen"
+    
+    # Baselines
+    yang2019: "salmon"
+    xiao2022: "orange"
+    li2026: "blue"
+    lin2016: "cyan"
+
+  line_markers:
+    custom_1: "o"
+    custom_2: "s"
+    custom_3: "^"
+    
+    yang2019: "D"
+    xiao2022: "v"
+    li2026: "<"
+    lin2016: ">"
+  
+  afc_params:
+    max_itr: 5000
+    dt: 0.01
+    gain: 80

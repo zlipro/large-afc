@@ -9,7 +9,7 @@ def tracking_error(config, target_config):
 
     return np.linalg.norm(config - target_config, axis=(0,1))
 
-def affine_formation_control_global(target_config, stress_mat, leader_id, gain = 1, max_itr = 10000, dt = 0.01):
+def affine_formation_control_global(target_config, stress_mat, leader_id, gain = 1, max_itr = 10000, dt = 0.01, init_config = None):
 
     # leader_id: list of leader node indices
 
@@ -20,7 +20,11 @@ def affine_formation_control_global(target_config, stress_mat, leader_id, gain =
 
     assert len(leader_id) >= D + 1, "leader nodes must be at least D + 1"
 
-    config = np.random.rand(D, N)
+    if init_config is None:
+        config = np.random.rand(D, N)
+    else:
+        config = init_config
+
     config_track = np.zeros((D, N, max_itr))
     # tracking_error = np.zeros(max_itr)
     
