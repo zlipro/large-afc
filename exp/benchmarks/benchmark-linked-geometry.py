@@ -45,6 +45,7 @@ def run_case(cfg, run_id):
 
     # Initialize results structure
     results = {
+        "geometry_type": cfg['geometry']['type'],
         "nominal_config": nominal_config,
         "stress_matrices": {},
         "runtimes": {}

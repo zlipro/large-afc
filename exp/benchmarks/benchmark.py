@@ -49,6 +49,7 @@ def run_case(cfg, run_id, solver_obj=None):
 
     # Initialize results structure
     results = {
+        "geometry_type": cfg['geometry']['type'],
         "nominal_config": nominal_config,
         "stress_matrices": {},
         "runtimes": {}
@@ -158,8 +159,8 @@ def run_case(cfg, run_id, solver_obj=None):
         # List of strategies to try in order: (Function Name, Incidence Generator)
         strategies = [
             ("Cauchy", lin2016.incidence_cauchy),
-            ("Grunbaum", lin2016.incidence_grunbaum),
-            ("FullyConnected", incidence_matrix_fully_connected) # Assuming this function exists in your module
+            ("Grunbaum", lin2016.incidence_grunbaum)
+            # ("FullyConnected", incidence_matrix_fully_connected) # Assuming this function exists in your module
         ]
         
         success = False

@@ -34,6 +34,7 @@ function show_help {
     echo "  -evaluate trunc-icosahedron     Run evaluation ONLY truncated icosahedron case"
     echo "  -evaluate trunc-icosahedron-linked     Run evaluation ONLY truncated icosahedron linked case"
     echo "  -evaluate letter-w     Run evaluation ONLY letter-w case"
+    echo "  -evaluate all-metrics  Generate plots of convergence rates, edge counts, and spectral efficiency for ALL benchmark cases"
     echo "  -all           Run everything (All Benchmarks -> Evaluate)"
     echo "  -edm           Run the EDM vs USI stress comparison script"
     echo "  -help          Show this message"
@@ -69,6 +70,9 @@ RUN_EVAL_CUBOCTAHEDRON=false
 RUN_EVAL_TRUNC_ICOSAHEDRON=false
 RUN_EVAL_TRUNC_ICOSAHEDRON_LINKED=false
 RUN_EVAL_LETTER_W=false
+RUN_EVAL_ALL_METRICS=false    
+
+
 # Check if no arguments were provided
 if [ $# -eq 0 ]; then
     echo "No arguments provided. Defaulting to DEMO mode."
@@ -181,6 +185,10 @@ else
                         RUN_EVAL_LETTER_W=true
                         shift # Consume the specific argument "letter-w"
                         ;;  
+                    all-metrics)
+                        RUN_EVAL_ALL_METRICS=true
+                        shift 
+                        ;;
                     *)
                         # No specific case provided (or next arg is another flag like -evaluate)
                         # Default to ALL benchmarks
@@ -193,7 +201,8 @@ else
                         RUN_EVAL_CUBOCTAHEDRON=true
                         RUN_EVAL_TRUNC_ICOSAHEDRON=true
                         RUN_EVAL_TRUNC_ICOSAHEDRON_LINKED=true
-                        RUN_EVAL_LETTER_W=true  
+                        RUN_EVAL_LETTER_W=true 
+                        RUN_EVAL_ALL_METRICS=true 
                         ;;
                 esac
                 ;;
@@ -220,6 +229,7 @@ else
                 RUN_EVAL_TRUNC_ICOSAHEDRON=true
                 RUN_EVAL_TRUNC_ICOSAHEDRON_LINKED=true
                 RUN_EVAL_LETTER_W=true
+                RUN_EVAL_ALL_METRICS=true
                 ;;
 
             -edm)
@@ -433,6 +443,14 @@ if [ "$RUN_EVAL_LETTER_W" = true ]; then
     echo "Running EVALUATION: Letter W Stats & Plots"
     echo "================================================================"
     python exp/benchmarks/evaluate.py --config configs/benchmarks/letter-w.yaml
+    echo ""
+fi
+
+if [ "$RUN_EVAL_ALL_METRICS" = true ]; then
+    echo "================================================================"
+    echo "Running EVALUATION: Convergence Rates Plot"
+    echo "================================================================"
+    python exp/benchmarks/evaluate.py --config configs/benchmarks/eval_all_metrics.yaml
     echo ""
 fi
 

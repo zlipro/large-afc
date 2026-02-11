@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-random-8"
-  total_runs: 10         # How many random cases to simulate
+  total_runs: 50         # How many random cases to simulate
   dim: 2                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 
@@ -21,7 +21,7 @@ opt_hyperparam_set_1:
   gamma: 0.1
 
 opt_hyperparam_set_2:
-  alpha: 1.0
+  alpha: 1.5
   beta: 1
   gamma: 0.1
 

@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-circular-10"
-  total_runs: 1          
+  total_runs: 50       
   dim: 2                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 

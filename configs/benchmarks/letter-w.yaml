@@ -1,6 +1,6 @@
 experiment:
-  name: "letter-w"
-  total_runs: 10         
+  name: "benchmark-letter-w"
+  total_runs: 50         
   dim: 3                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 
@@ -12,7 +12,7 @@ custom_algs:
   custom_mc: true
 
 opt_hyperparam_set:
-  alpha: 1.0
+  alpha: 1.5
   beta: 1
   gamma: 0.1
 

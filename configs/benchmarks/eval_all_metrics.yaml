@@ -1,0 +1,33 @@
+experiment:
+  name: "eval_all_metrics"             # Special keyword to trigger global evaluation
+
+evaluation:
+  # Where the .npy files are located
+  input_dir: "results/stress_mats"
+  
+  # Where to save the plots
+  output_dir: "results/benchmark-plots"
+
+  sparse_tol: 1e-5       # Tolerance for counting edges
+
+  # Global styling for all plots
+  line_colors:
+    custom_1: "#069AF3"
+    custom_2: &color_2 "orchid"
+    custom_3: "yellowgreen"
+    custom_mc: *color_2
+    yang2019: "salmon"
+    xiao2022: "orange"
+    li2026: "green"
+    lin2016: "cyan"
+
+  line_markers:
+   line_markers:
+    custom_1: "o"
+    custom_2: &marker_2 "s"
+    custom_3: "^"
+    custom_mc: *marker_2
+    yang2019: "D"
+    xiao2022: "v"
+    li2026: "<"
+    lin2016: ">"
