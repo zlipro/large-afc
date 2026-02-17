@@ -1,7 +1,8 @@
 experiment:
   n_nodes: 100
   overlaps: [2, 5, 10, 20]
-  n_trials: 10
+  n_trials: 10              # this is trials for random overlap generation
+  n_afc_runs: 10
   output_dir: "results/stress_mats"
   plot_dir: "results/"
   filename_prefix: "mc-"
@@ -12,7 +13,24 @@ hyperparams:
   gamma: 0.1
 
 control:
-  gain: 30
-  max_itr: 3000        # Reduced from 5000 for speed (increase if needed)
+  gain: 40
+  max_itr: 3000
   dt: 0.01
   n_leaders: 5
+
+line_colors:
+  overlap_2: "#069AF3"
+  overlap_5: "orchid"
+  overlap_10: "yellowgreen"
+  overlap_20: "salmon"
+
+markers:
+  overlap_2: "o"
+  overlap_5: "s"
+  overlap_10: "^"
+  overlap_20: "D"
+
+cluster_colors:
+  cluster_1: "yellowgreen"
+  cluster_2: "orchid"
+  mutual: "#069AF3"
