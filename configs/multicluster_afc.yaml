@@ -1,0 +1,18 @@
+experiment:
+  n_nodes: 100
+  overlaps: [2, 5, 10, 20]
+  n_trials: 10
+  output_dir: "results/stress_mats"
+  plot_dir: "results/"
+  filename_prefix: "mc-"
+
+hyperparams:
+  alpha: 1.5
+  beta: 1
+  gamma: 0.1
+
+control:
+  gain: 30
+  max_itr: 3000        # Reduced from 5000 for speed (increase if needed)
+  dt: 0.01
+  n_leaders: 5

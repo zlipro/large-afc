@@ -37,6 +37,7 @@ function show_help {
     echo "  -evaluate all-metrics  Generate plots of convergence rates, edge counts, and spectral efficiency for ALL benchmark cases"
     echo "  -all           Run everything (All Benchmarks -> Evaluate)"
     echo "  -edm           Run the EDM vs USI stress comparison script"
+    echo "  -multicluster  Run the multicluster AFC example on random-100 geometry"
     echo "  -help          Show this message"
     echo ""
 }
@@ -57,7 +58,8 @@ RUN_BENCH_TRUNC_ICOSAHEDRON=false
 RUN_BENCH_TRUNC_ICOSAHEDRON_LINKED=false
 RUN_BENCH_LETTER_W=false
 
-RUN_EDM = false
+RUN_EDM=false
+RUN_MULTICLUSTER=false
 
 # Evaluation specific flags
 RUN_EVAL_RANDOM_5=false
@@ -235,6 +237,10 @@ else
             -edm)
                 RUN_EDM=true
                 shift # Consume the specific argument "edm"
+                ;;
+            -multicluster)
+                RUN_MULTICLUSTER=true
+                shift # Consume the specific argument "multicluster"
                 ;;
                 
             -help) show_help; exit 0 ;;
@@ -460,6 +466,14 @@ if [ "$RUN_EDM" = true ]; then
     echo "Running EDM vs USI Stress Comparison"
     echo "================================================================"
     python exp/sim_edm_usi.py
+    echo ""
+fi
+
+if [ "$RUN_MULTICLUSTER" = true ]; then
+    echo "================================================================"
+    echo "Running Multicluster AFC Example on Random-100 Geometry"
+    echo "================================================================"
+    python exp/multicluster_afc.py
     echo ""
 fi
 echo "All scripts Executed."

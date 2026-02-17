@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-trunc-icosahedron-linked"
-  total_runs: 50         
+  total_runs: 1         
   dim: 3                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 

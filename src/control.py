@@ -182,7 +182,8 @@ def multicluster_afc_distributed(target_config: np.ndarray,
                                 stress_mat_list: list,
                                 max_itr: int = 10000, 
                                 dt: float = 0.01, 
-                                gain: float = 10.0):
+                                gain: float = 10.0,
+                                init_config: np.ndarray = None):
     """
     Distributed AFC for multicluster formations.
     Each agent only has access to local information from its subgraphs.
@@ -190,7 +191,8 @@ def multicluster_afc_distributed(target_config: np.ndarray,
     """
     D, N = target_config.shape
 
-    init_config = np.random.rand(D, N) * 10  # random position in 10x10 area
+    if init_config is None:
+        init_config = np.random.rand(D, N) * 10  # random position in 10x10 area
 
     # initialize agents
     agents = []
@@ -229,7 +231,7 @@ def multicluster_afc_distributed(target_config: np.ndarray,
                       dt=dt)
         agents.append(agent)
 
-    print(f"All agents initialized.")
+    # print(f"All agents initialized.")
 
     config_track = np.zeros((D, N, max_itr+1))
     config_track[:, :, 0] = init_config  # initial configuration

@@ -10,23 +10,31 @@ evaluation:
 
   sparse_tol: 1e-5       # Tolerance for counting edges
 
-  # Global styling for all plots
   line_colors:
-    custom_1: "#069AF3"
+    custom_1: &color_1 "#069AF3"
     custom_2: &color_2 "orchid"
-    custom_3: "yellowgreen"
-    custom_mc: *color_2
+    custom_3: &color_3 "yellowgreen"
+    
+    # Keys matching the Python rename logic
+    custom_mc_1: *color_1
+    custom_mc_2: *color_2
+    custom_mc_3: *color_3
+    
     yang2019: "salmon"
     xiao2022: "orange"
-    li2026: "green"
+    li2026: "blue"
     lin2016: "cyan"
 
   line_markers:
-   line_markers:
-    custom_1: "o"
+    custom_1: &marker_1 "o"
     custom_2: &marker_2 "s"
-    custom_3: "^"
-    custom_mc: *marker_2
+    custom_3: &marker_3 "^"
+    
+    custom_mc_1: "X"
+    custom_mc_2: "+"
+    custom_mc_3: "h"
+  
+    
     yang2019: "D"
     xiao2022: "v"
     li2026: "<"

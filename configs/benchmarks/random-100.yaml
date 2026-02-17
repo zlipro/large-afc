@@ -16,7 +16,7 @@ custom_algs:
 
 custom_mc_params:
   num_clusters: 2
-  node_per_cluster: 70
+  node_per_cluster: 60
 
 # Custom Algorithm Hyperparameters
 opt_hyperparam_set_1:

@@ -83,34 +83,32 @@ def run_case(cfg, run_id, solver_obj=None):
             results['stress_matrices']['custom_usi'] = my_stress
             results['runtimes']['custom_usi'] = t1 - t0
     if custom_algs.get('custom_mc'):
-        hparams = cfg.get('opt_hyperparam_set_2')     # use a generic hyperparam set
-        if hparams is not None:
-            # print(f"    > Running Proposed-MC...")
-            num_clusters = cfg.get('custom_mc_params').get('num_clusters')
-            node_per_cluster = cfg.get('custom_mc_params').get('node_per_cluster')
-            if cfg['geometry']['type'] == 'random':   
-                subgraph_glb_idx = random_multicluster_indices(num_nodes, num_clusters, node_per_cluster)
 
-                
-            # print(f"        > Subgraph Indices: {subgraph_glb_idx}")
-            t0 = time.perf_counter()
-            my_stress = stress.compute_stress_multicluster(nominal_config, 
-                                                           subgraph_glb_idx=subgraph_glb_idx, 
-                                                           hyperparam_dict=hparams, 
-                                                           parallel=False) 
-            t1 = time.perf_counter()
-            my_stress_global = find_global_stress_mat(my_stress, subgraph_glb_idx, num_nodes)
+        for i in range(1, 4):
+            param_key = f'opt_hyperparam_set_{i}'
+            hparams = cfg.get(param_key)
+            # hparams = cfg.get('opt_hyperparam_set_2')     # use a generic hyperparam set
+            if hparams is not None:
+                # print(f"    > Running Proposed-MC...")
+                num_clusters = cfg.get('custom_mc_params').get('num_clusters')
+                node_per_cluster = cfg.get('custom_mc_params').get('node_per_cluster')
+                if cfg['geometry']['type'] == 'random':   
+                    subgraph_glb_idx = random_multicluster_indices(num_nodes, num_clusters, node_per_cluster)
 
-            # # print the first 5 eigenvalues of the global stress matrix
-            # eigvals = np.linalg.eigvals(my_stress_global)
-            # eigvals = np.sort(np.real(eigvals))
-            # print(f"        > First 5 Eigenvalues of Global MC Stress Matrix: {eigvals[:5]}")
+                    
+                # print(f"        > Subgraph Indices: {subgraph_glb_idx}")
+                t0 = time.perf_counter()
+                my_stress = stress.compute_stress_multicluster(nominal_config, 
+                                                            subgraph_glb_idx=subgraph_glb_idx, 
+                                                            hyperparam_dict=hparams, 
+                                                            parallel=False) 
+                t1 = time.perf_counter()
+                my_stress_global = find_global_stress_mat(my_stress, subgraph_glb_idx, num_nodes)
+                # Store the consolidated global matrix (useful for eigenvalue analysis)
+                results['stress_matrices'][f'custom_mc_global_{i}'] = my_stress_global
+                results['stress_matrices'][f'custom_mc_{i}]'] = my_stress
+                results['runtimes'][f'custom_mc_{i}'] = t1 - t0
 
-
-            # Store the consolidated global matrix (useful for eigenvalue analysis)
-            results['stress_matrices']['custom_mc_global'] = my_stress_global
-            results['stress_matrices']['custom_mc'] = my_stress
-            results['runtimes']['custom_mc'] = t1 - t0
 
     # --- Run Baselines ---
     baselines = cfg['baselines']
@@ -251,7 +249,7 @@ if __name__ == "__main__":
                   f"Custom-generic 2: {fmt(times.get('custom_2'))} | "
                   f"Custom-generic 3: {fmt(times.get('custom_3'))} | "
                   f"Custom-USI: {fmt(times.get('custom_usi'))} | "
-                  f"Custom-MC: {fmt(times.get('custom_mc'))} | "
+                  f"Custom-MC: {fmt(times.get('custom_mc_1'))} | "
                   f"Yang: {fmt(times.get('yang2019'))} | "
                   f"Li: {fmt(times.get('li2026'))} | "
                   f"Lin: {fmt(times.get('lin2016'))} | "

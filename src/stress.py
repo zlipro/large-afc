@@ -266,7 +266,7 @@ def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict
         N_CORES = psutil.cpu_count(logical=False)
         processes_needed = len(subgraph_glb_idx)
         
-        print(f"Starting parallel optimization on {processes_needed} tasks...")
+        # print(f"Starting parallel optimization on {processes_needed} tasks...")
 
         # --- PREPARE THE DATA ---
         # We move the data preparation (slicing) here, into the "big function".
