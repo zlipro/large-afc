@@ -158,7 +158,6 @@ def run_case(cfg, run_id, solver_obj=None):
         strategies = [
             ("Cauchy", lin2016.incidence_cauchy),
             ("Grunbaum", lin2016.incidence_grunbaum)
-            # ("FullyConnected", incidence_matrix_fully_connected) # Assuming this function exists in your module
         ]
         
         success = False

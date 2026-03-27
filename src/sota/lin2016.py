@@ -27,7 +27,7 @@ def incidence_grunbaum(N):
     if N < 4:
         raise ValueError("N must be at least 4 to define a Grunbaum polygon structure.")
 
-    # 1. Define the Edges
+    # Define the Edges
     edges = []
     
     # Boundary Cycle: (0,1), (1,2), ..., (N-1,0)
@@ -45,7 +45,7 @@ def incidence_grunbaum(N):
         
     M = len(edges)
     
-    # 2. Construct the Matrix
+    # Construct the Matrix
     # Shape: (N nodes, M edges)
     inc_mat = np.zeros((N, M), dtype=int)
     
@@ -87,12 +87,12 @@ def incidence_cauchy(N):
 
     edges = []
     
-    # 1. Boundary Cycle: (0,1), (1,2), ..., (N-1,0)
+    # Boundary Cycle: (0,1), (1,2), ..., (N-1,0)
     for i in range(N):
         u, v = i, (i + 1) % N
         edges.append((u, v))
         
-    # 2. Cauchy Diagonals: Connect node i to node i+2
+    # Cauchy Diagonals: Connect node i to node i+2
     # We use a set to track added edges to avoid duplicates (important for N=4)
     diag_edges_set = set()
     
@@ -110,7 +110,7 @@ def incidence_cauchy(N):
             
     M = len(edges)
     
-    # 3. Construct the Matrix
+    # Construct the Matrix
     # Shape: (N nodes, M edges)
     inc_mat = np.zeros((N, M), dtype=int)
     
@@ -144,23 +144,17 @@ def optimize_with_incidence(incidence_mat, nominal_config):
     N, M = incidence_mat.shape
     D, _ = nominal_config.shape
 
-    # --- 1. SVD on Augmented Configuration ---
-    # MATLAB: augmented_config = [nominal_config', ones(N,1)];
+    # --- SVD on Augmented Configuration ---
     ones_col = np.ones((N, 1))
     augmented_config = np.hstack((nominal_config.T, ones_col))
 
     # Compute SVD
-    # MATLAB: [U,~,~] = svd(augmented_config);
-    # np.linalg.svd returns U, S, Vh. full_matrices=True guarantees U is NxN.
     U, _, _ = np.linalg.svd(augmented_config, full_matrices=True)
 
     # Extract Null Space Basis Q
-    # MATLAB: Q = U(:, D+2:end); (D+2 is 1-based index)
-    # Python: This corresponds to slicing from index D+1 to the end.
-    # Columns 0 to D (total D+1 columns) are the range, D+1 onwards is null space.
     Q = U[:, D+1:]
 
-    # --- 2. Convex Optimization (SDP) ---
+    # --- Convex Optimization (SDP) ---
     weights = cp.Variable(M)
     stress = cp.Variable((N, N), symmetric=True)
 
@@ -170,9 +164,6 @@ def optimize_with_incidence(incidence_mat, nominal_config):
     # stress == incidence_mat * diag(weights) * incidence_mat'
     constraints.append(stress == incidence_mat @ cp.diag(weights) @ incidence_mat.T)
 
-    # Constraint 2: PSD on the null space
-    # Q'*stress*Q >= 1e-3*eye(N-D-1)
-    # In CVXPY, '>>' denotes the Positive Semidefinite inequality.
     target_dim = N - D - 1
     constraints.append(Q.T @ stress @ Q >> 1e-3 * np.eye(target_dim))
 
@@ -184,101 +175,19 @@ def optimize_with_incidence(incidence_mat, nominal_config):
     prob = cp.Problem(cp.Minimize(0), constraints)
     
     # Solve
-    # Using 'SCS' or 'CVXOPT' is common for SDPs, but default usually works.
     prob.solve()
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         raise ValueError(f"Optimization failed with status: {prob.status}")
 
-    # --- 3. Post-processing ---
+    # --- Post-processing ---
     # Extract values
     w_val = weights.value
 
     # Normalize weights
-    # MATLAB: weights = weights./norm(weights);
     w_norm = w_val / np.linalg.norm(w_val)
 
     # Recompute stress to ensure consistency with normalized weights
-    # MATLAB: stress = incidence_mat*diag(weights)*incidence_mat';
     stress_final = incidence_mat @ np.diag(w_norm) @ incidence_mat.T
 
     return stress_final
-
-# def optimize_as_feasibility(incidence_mat, nominal_config):
-#     """
-#     Computes the stress matrix for a given nominal configuration using SDP.
-    
-#     Args:
-#         incidence_mat (np.ndarray): (N x M) incidence matrix.
-#         nominal_config (np.ndarray): (D x N) nominal configuration matrix.
-        
-#     Returns:
-#         np.ndarray: (N x N) Normalized stress matrix.
-#     """
-#     # Ensure inputs are numpy arrays
-#     incidence_mat = np.array(incidence_mat)
-#     nominal_config = np.array(nominal_config)
-    
-#     # Get dimensions: N agents, M edges, D dimension
-#     N, M = incidence_mat.shape
-#     D, N_conf = nominal_config.shape
-    
-#     if N != N_conf:
-#         raise ValueError(f"Shape mismatch: Incidence matrix has {N} nodes, config has {N_conf}.")
-
-#     # --- Pre-processing: Null Space Basis (Q) ---
-#     # Construct augmented configuration: [p_1 ... p_N; 1 ... 1]^T
-#     # Shape: N x (D+1)
-#     augmented_config = np.hstack([nominal_config.T, np.ones((N, 1))])
-    
-#     # Compute SVD to get the basis Q for the kernel of the augmented configuration
-#     # MATLAB: [U,~,~] = svd(augmented_config); Q = U(:,D+2:end);
-#     # Python: U is NxN. Columns D+1 to end span the null space.
-#     U, _, _ = np.linalg.svd(augmented_config)
-#     Q = U[:, D+1:]  # Shape: N x (N - D - 1)
-
-#     # --- CVXPY Optimization ---
-#     # Variable: Edge weights
-#     weights = cp.Variable(M)
-    
-#     # Define Stress Matrix: Omega = H * diag(w) * H^T
-#     # Note: cp.diag(weights) creates a sparse diagonal variable
-#     stress = incidence_mat @ cp.diag(weights) @ incidence_mat.T
-    
-#     # Constraints
-#     constraints = []
-    
-#     # 1. Equilibrium condition: Omega * p = 0
-#     # Equivalent to stress * nominal_config' == 0 in MATLAB
-#     constraints.append(stress @ nominal_config.T == 0)
-    
-#     # 2. Universal Rigidity/Stabilizability Constraint
-#     # Enforce Positive Definiteness on the null space basis Q
-#     # MATLAB: Q'*stress*Q >= 1e-3*eye(N-D-1)
-#     target_eye = np.eye(N - D - 1) * 1e-3
-#     constraints.append(Q.T @ stress @ Q >> target_eye)
-    
-#     # Optimization Problem (Feasibility)
-#     # We minimize 0 just to find a feasible point satisfying constraints
-#     prob = cp.Problem(cp.Minimize(0), constraints)
-    
-#     # Solve using an SDP-capable solver (SCS is a common open-source choice)
-#     try:
-#         prob.solve(solver=cp.SCS, verbose=False)
-#     except cp.SolverError:
-#         prob.solve(verbose=False) # Fallback to default solver
-        
-#     if prob.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
-#         raise RuntimeError(f"Optimization failed. Status: {prob.status}")
-
-#     # --- Post-processing ---
-#     # Extract weights
-#     w_val = weights.value
-    
-#     # Normalize weights (as done in the MATLAB script)
-#     w_norm = w_val / np.linalg.norm(w_val)
-    
-#     # Recompute the final stress matrix using normalized weights
-#     final_stress = incidence_mat @ np.diag(w_norm) @ incidence_mat.T
-    
-#     return final_stress

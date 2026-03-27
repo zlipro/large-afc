@@ -32,7 +32,7 @@ def plot_geometry(geometry_name,
     else:
         ax = fig.add_subplot(111)
 
-    # 1. Determine Node Colors
+    # Determine Node Colors
     if cluster_indices is not None:
         num_nodes = nominal_config.shape[1]
         node_colors = np.zeros((num_nodes, 4))
@@ -46,7 +46,7 @@ def plot_geometry(geometry_name,
     else:
         color_arg = 'red'
 
-    # 2. Visualize Graph
+    # Visualize Graph
     outlining_graph = Graph(adj_mat)    
     outlining_graph.visualize(
         node_pos=nominal_config, 
@@ -57,7 +57,7 @@ def plot_geometry(geometry_name,
         linewidth=0.5
     )
 
-    # 3. Set Axis Limits with Padding
+    # Set Axis Limits with Padding
     # Helper to calculate padded limits
     def get_padded_limits(data, pad_factor=0.1):
         d_min, d_max = data.min(), data.max()
@@ -82,7 +82,7 @@ def plot_geometry(geometry_name,
     ax.set_aspect('equal')
     ax.set_axis_off()
 
-    # 4. Save the figure
+    # Save the figure
     output_filename = f"./results/geometry-plots/{geometry_name}.pdf"
     plt.savefig(output_filename, format='pdf', bbox_inches='tight')
 

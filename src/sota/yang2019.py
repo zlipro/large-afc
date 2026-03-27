@@ -30,7 +30,7 @@ def sparse_nullspace_recon(nominal_config):
         raise ValueError(f"Number of nodes (N={N}) must be at least D+2 ({D_dim+2}) "
                          "for the construction of a universally rigid framework.")
 
-    # --- Step 1 & Definition: Construct Extended Configuration Matrix Q* ---
+    # --- Definition: Construct Extended Configuration Matrix Q* ---
     # According to Eq. (1), Q* is formed by stacking the configuration q* # with a row of ones[cite: 87, 139].
     # Q* has shape (D+1, N)
     ones_row = np.ones((1, N))
@@ -38,10 +38,9 @@ def sparse_nullspace_recon(nominal_config):
 
     # print(Q_star)
 
-    # --- Step 2 & 3: Construct Matrix D ---
+
     # We construct a sparse matrix D such that Q* @ D = 0.
     # D corresponds to the 'Gale matrix' components.
-    # The matrix D has shape N x (N - D - 1)[cite: 106].
     # The algorithm uses a sliding window of columns from Q* to create a band structure.
     
     num_cols_D = N - D_dim - 1
@@ -60,11 +59,8 @@ def sparse_nullspace_recon(nominal_config):
         # Shape: (D+1) x (D+2)
         sub_Q = Q_star[:, start_idx:end_idx]
         
-        # Solve for the null space of this submatrix (Eq. 7)[cite: 168].
-        # Since rows are D+1 and columns are D+2, the null space is 1-dimensional 
-        # (assuming general position).
-        # We use SVD: sub_Q = U * S * Vh
-        # The null vector corresponds to the last row of Vh (or last column of V).
+        # Solve for the null space of this submatrix
+       
         u, s, vh = svd(sub_Q)
         null_vector = vh[-1, :]
         
@@ -73,10 +69,8 @@ def sparse_nullspace_recon(nominal_config):
         # which maps to rows start_idx through end_idx in D[cite: 141, 144].
         D_matrix[start_idx:end_idx, j] = null_vector
     # print(D_matrix)
-    # --- Step 4: Compute Stress Matrix Omega ---
-    # The stress matrix is calculated as Omega = D * D.T[cite: 172].
-    # Note: The paper notes that Omega can be D * Psi * D.T where Psi is a scaling matrix,
-    # but sets Psi = Identity for simplicity[cite: 187, 188].
+    # --- Compute Stress Matrix Omega ---
+    # The stress matrix is calculated as Omega = D * D.T
     Omega = D_matrix @ D_matrix.T
 
     return Omega

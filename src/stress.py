@@ -93,17 +93,14 @@ def optimized_stress_symm(nominal_config: np.ndarray, hyperparam_dict: dict, ver
     Psi = Q.T @ incidence_full
     
     # Pre-calculate phi for the objective function term
-    # phi = diag(Psi.T @ Psi) [cite: 116]
+
     phi = np.diag(Psi.T @ Psi)
 
-    ########## Convex Optimization (P3) ##########
-    # Variable is reduced_weights (omega_underbar) [cite: 271]
     reduced_weights = cp.Variable(K_groups)
     
     # Map back to full weights: omega_bar = S @ omega_underbar [cite: 276]
     weights = S_map @ reduced_weights
     
-    # Objective: Minimize L1 norm - alpha * convergence term [cite: 274]
     # Note: cp.norm(weights, 1) automatically handles the mapping S
     obj = cp.Minimize(cp.norm(weights, 1) - hyperparam_dict['alpha'] * phi.T @ weights)
     
@@ -119,8 +116,6 @@ def optimized_stress_symm(nominal_config: np.ndarray, hyperparam_dict: dict, ver
     ]
     
     prob = cp.Problem(obj, constraints)
-    
-    # Using SCS or CLARABEL as they handle PSD cones well
     try:
         prob.solve(solver=cp.SCS, verbose=verbose)
     except:
@@ -146,7 +141,7 @@ def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict,
     """
     D, N = nominal_config.shape
     
-    # 1. Setup & Symmetry Detection
+    # Setup & Symmetry Detection
     incidence_full = incidence_matrix_fully_connected(N)
     S_map, unique_dists = get_symmetry_mapping_matrix(nominal_config)
     K_groups = S_map.shape[1]
@@ -154,7 +149,7 @@ def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict,
     if verbose:
         print(f"USI Method: Collapsing {S_map.shape[0]} edges -> {K_groups} groups.")
 
-    # 2. Pre-compute Geometry (Standard)
+    # Pre-compute Geometry (Standard)
     augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
     U, _, _ = np.linalg.svd(augmented_config)
     Q = U[:, D+1:]
@@ -162,25 +157,15 @@ def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict,
     Psi = Q.T @ incidence_full
     phi = np.diag(Psi.T @ Psi)
     
-    # 3. --- CRITICAL OPTIMIZATION START ---
-    
-    # A. Objective Reduction
-    # Instead of norm(S @ w_reduced, 1), we use a weighted L1 norm of w_reduced.
-    # Because groups are disjoint, ||w||_1 = sum(|w_k| * count_of_edges_in_group_k)
     group_counts = np.sum(S_map, axis=0) # Shape (K,)
     
     # Reduced linear term: phi^T @ S
     phi_reduced = phi @ S_map # Shape (K,)
 
-    # B. Equilibrium Constraint Reduction
-    # Old: E_full (huge) @ S @ w_red
-    # New: E_reduced (smaller) @ w_red
+
     E_full = np.vstack([augmented_config.T @ incidence_full @ np.diag(incidence_full.T[:, n]) for n in range(N)])
     E_reduced = E_full @ S_map # Shape (Constraints, K)
 
-    # C. PSD & Spectral Constraint Matrix Pre-calculation
-    # We pre-calculate the "Basis Matrices" for each group. 
-    # M_k = Sum of matrices for all edges in group k
     
     # For PSD: P_k = Psi * diag(col_k of S) * Psi.T
     PSD_matrices = []
@@ -194,18 +179,14 @@ def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict,
         
         # Reduced PSD term for this group
         # Corresponds to: Psi @ diag(edge_mask) @ Psi.T
-        # Optimization: We only select columns of Psi where edge_mask is 1
         Psi_k = Psi[:, edge_mask > 0.5] 
         P_k = Psi_k @ Psi_k.T
         PSD_matrices.append(P_k)
         
-        # Reduced Laplacian term for this group
-        # Corresponds to: Inc @ diag(edge_mask) @ Inc.T
         Inc_k = incidence_full[:, edge_mask > 0.5]
         L_k = Inc_k @ Inc_k.T
         Spectral_matrices.append(L_k)
 
-    # 4. --- CONVEX OPTIMIZATION (Tiny Problem Size) ---
     
     reduced_weights = cp.Variable(K_groups)
     
@@ -269,8 +250,6 @@ def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict
         # print(f"Starting parallel optimization on {processes_needed} tasks...")
 
         # --- PREPARE THE DATA ---
-        # We move the data preparation (slicing) here, into the "big function".
-        # We create a list of tuples: [(config_1, params), (config_2, params), ...]
         tasks_args = [
             (target_config[:, subgraph], hyperparam_dict) 
             for subgraph in subgraph_glb_idx
@@ -278,14 +257,10 @@ def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict
         
         # --- EXECUTE ---
         # threadpool_limits here ensures that if the system forks (Linux), 
-        # the children inherit the thread limits.
         with threadpool_limits(limits=6, user_api='blas'):
             
             # We use min() to avoid creating more processes than necessary
             with multiprocessing.Pool(processes=min(processes_needed, N_CORES)) as pool:
-                
-                # starmap is the key: it unpacks the tuple arguments automatically
-                # equivalent to: optimize_stress(arg1, arg2)
                 stress_mat_list = pool.starmap(optimize_stress, tasks_args)
 
         return stress_mat_list
@@ -302,11 +277,5 @@ def sparsity_truncation(sparse_tol: float, stress_mat: np.ndarray):
     stress_mat_trunc[np.abs(stress_mat_trunc) < sparse_tol] = 0
 
     return stress_mat_trunc
-
-
-
-def quantizaiton_refinement():
-
-    pass
 
     

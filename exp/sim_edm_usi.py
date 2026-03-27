@@ -22,7 +22,6 @@ def visualize_comparison(stress_gen, stress_usi, edm_mat, geometry = None, cmap 
     for mat in [s_gen, s_usi, edm]:
         np.fill_diagonal(mat, np.nan)
 
-    # --- 1. Determine Common Scale for Stress ---
     # We find the min/max across BOTH matrices to lock the colorbar
     # Using nanmin/nanmax ignores the white diagonals
     vmin_stress = min(np.nanmin(s_gen), np.nanmin(s_usi))
@@ -32,7 +31,6 @@ def visualize_comparison(stress_gen, stress_usi, edm_mat, geometry = None, cmap 
     fig, axes = plt.subplots(1, 3, figsize=(9, 3))
     
     # Define Colormaps with 'bad' (NaN) set to White
-    # We use 'viridis' for all, or you can switch EDM to 'plasma' if preferred
     cmap_common = plt.get_cmap(cmap).copy()
     cmap_common.set_bad(color='white')
 
@@ -40,16 +38,15 @@ def visualize_comparison(stress_gen, stress_usi, edm_mat, geometry = None, cmap 
     im1 = axes[0].imshow(s_gen, cmap=cmap_common, interpolation='nearest',
                          vmin=vmin_stress, vmax=vmax_stress)
     axes[0].set_title("Generic")
-    # We don't need a colorbar here if we share it, but keeping it for clarity
     plt.colorbar(im1, ax=axes[0], fraction=0.046, pad=0.04)
     
-    # 2. USI Stress (Geometric)
+    # USI Stress (Geometric)
     im2 = axes[1].imshow(s_usi, cmap=cmap_common, interpolation='nearest',
                          vmin=vmin_stress, vmax=vmax_stress)
     axes[1].set_title("USI Method")
     plt.colorbar(im2, ax=axes[1], fraction=0.046, pad=0.04)
     
-    # 3. EDM Matrix
+    # EDM Matrix
     # EDM has a different scale (distances vs stress), so we let it auto-scale
     # But we use the same colormap style
     im3 = axes[2].imshow(edm, cmap=cmap_common, interpolation='nearest')
@@ -71,8 +68,6 @@ if __name__ == "__main__":
     nominal_config = geometry.circular_config(N)
     
     # Compute EDM (for Visualization)
-    # pdist computes pairwise distances, squareform makes it a matrix
-    # We want squared distances for standard EDM
     dists = pdist(nominal_config.T)
     edm_mat = squareform(dists ** 2)
     

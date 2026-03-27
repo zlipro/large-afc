@@ -53,7 +53,7 @@ def run_case(cfg, run_id):
     
     custom_algs = cfg.get('custom_algs', {})
 
-    # --- 2. Custom MC (Multi-Cluster) ---
+    # --- Custom MC (Multi-Cluster) ---
     if custom_algs.get('custom_mc'):
         hparams = cfg.get('opt_hyperparam_set')
         if hparams is not None:
@@ -74,7 +74,7 @@ def run_case(cfg, run_id):
             results['stress_matrices']['custom_mc_global'] = my_stress_global
             results['runtimes']['custom_mc'] = t1 - t0
 
-    # --- 3. Run Baselines ---
+    # ---  Run Baselines ---
     baselines = cfg.get('baselines', {})
 
     # Yang 2019

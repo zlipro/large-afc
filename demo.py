@@ -29,15 +29,14 @@ def save_formation_video(all_data, cluster_indices=None, leaders_idx=[],
     """
     print(f">>> Rendering video to {filename}...")
     
-    # 1. Downsample Data
+    # Downsample Data
     data_subset = all_data[::downsample]
     num_frames, _, num_nodes = data_subset.shape
     
-    # 2. Setup Figure (No Frame)
+    # Setup Figure (No Frame)
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
     
-    # --- COLOR SETUP (Cluster-Uniform 'cool') ---
     cmap = plt.get_cmap('cool') 
     node_colors = np.zeros((num_nodes, 4)) # RGBA
     
@@ -162,19 +161,15 @@ def plot_trajectory_3d(all_data, phase_steps, cluster_indices=None, leaders_idx=
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
-    # 1. Setup Colors ('cool' map)
     # We generate a spectrum of colors for the nodes
     cmap = plt.get_cmap('cool') 
     node_colors = [cmap(i / num_nodes) for i in range(num_nodes)]
 
-    # 2. Plot Loop: Iterate through each Keyframe (Phase End)
-    # We draw the dots at the keyframe, and the trail leading up to it.
     
     for step_idx in phase_steps:
         # Clamp index
         if step_idx >= num_steps: step_idx = num_steps - 1
         
-        # --- A. Plot Trails (The "Tail") ---
         # Only plot trails if we are past the start
         if step_idx > 0:
             start_trail = max(0, step_idx - trail_length)
@@ -199,7 +194,7 @@ def plot_trajectory_3d(all_data, phase_steps, cluster_indices=None, leaders_idx=
                 ax.plot(trail_data[:, 0, i], trail_data[:, 1, i], trail_data[:, 2, i], 
                         color=c, alpha=alpha, linewidth=lw, zorder=zorder)
 
-        # --- B. Plot Scatter Dots (The "Head") ---
+        # --- Plot Scatter Dots (The "Head") ---
         current_config = all_data[step_idx]
         
         # Prepare arrays for scatter
@@ -242,41 +237,8 @@ def plot_trajectory_3d(all_data, phase_steps, cluster_indices=None, leaders_idx=
     
     # Force cubic aspect
     ax.set_box_aspect([1, 1, 1])
-
-
-    # # --- 4. ADD CUSTOM AXIS SIGN (Corner of Plot) ---
-    # # Move the axis indicator to the bottom-left-back corner of the bounding box
-    # # 'buffer' defines the edge of the cube relative to the center
-    # axis_origin_x = mid_x - buffer * 0.9
-    # axis_origin_y = mid_y - buffer * 0.9
-    # axis_origin_z = mid_z - buffer * 0.9
     
-    # # Length of the arrows (slightly smaller to fit in the corner)
-    # axis_len = max_range * 0.3
-    
-    # # Quiver arguments: x, y, z, u, v, w. 
-    # # We use 'black' for all axes as requested.
-    
-    # # X-Axis
-    # ax.quiver(axis_origin_x, axis_origin_y, axis_origin_z, axis_len, 0, 0, 
-    #           color='black', linewidth=1.5, arrow_length_ratio=0.15)
-    # ax.text(axis_origin_x + axis_len, axis_origin_y, axis_origin_z, "x", 
-    #         color='black', fontsize=12, fontweight='bold')
-    
-    # # Y-Axis
-    # ax.quiver(axis_origin_x, axis_origin_y, axis_origin_z, 0, axis_len, 0, 
-    #           color='black', linewidth=1.5, arrow_length_ratio=0.15)
-    # ax.text(axis_origin_x, axis_origin_y + axis_len, axis_origin_z, "y", 
-    #         color='black', fontsize=12, fontweight='bold')
-    
-    # # Z-Axis
-    # ax.quiver(axis_origin_x, axis_origin_y, axis_origin_z, 0, 0, axis_len, 
-    #           color='black', linewidth=1.5, arrow_length_ratio=0.15)
-    # ax.text(axis_origin_x, axis_origin_y, axis_origin_z + axis_len, "z", 
-    #         color='black', fontsize=12, fontweight='bold')
-    # # -----------------------------------------------
-    
-    # 4. Final Polish
+    # Final Polish
     if view_angle is not None:
         ax.view_init(elev=view_angle[0], azim=view_angle[1], roll = view_angle[2])
         
@@ -409,7 +371,7 @@ if __name__ == "__main__":
     plot_trajectory_3d(
         all_data, 
         phase_steps=checkpoints, 
-        cluster_indices=subgraph_glb_idx,  # <--- THIS WAS LIKELY MISSING
+        cluster_indices=subgraph_glb_idx,
         leaders_idx=[],  # You can set this to flat_leaders if you want to highlight them] 
         view_angle=(13, -147, 0),
         node_size=5,
@@ -423,69 +385,4 @@ if __name__ == "__main__":
     leaders_idx=[],
     filename='results/demo_formation.gif',
     downsample=20 # Adjust speed here
-    )   
-
-    # # 5. Visualization
-    # # Concatenate all phases -> (Total_Steps, D, N)
-    
-    # total_frames = all_data.shape[0]
-
-    # # --- A. Plot Error (Velocity Magnitude) ---
-    # # We estimate velocity as diff between frames
-    # velocities = np.diff(all_data, axis=0) # Shape (T-1, D, N)
-    # # Norm over D (dim 1), then mean over N (nodes)
-    # vel_mags = np.linalg.norm(velocities, axis=1)
-    # mean_vel_error = np.mean(vel_mags, axis=1)
-
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(mean_vel_error)
-    # # Add vertical lines for phase changes
-    # for i in range(1, len(phases)):
-    #     plt.axvline(x=i * steps_per_phase, color='r', linestyle='--', alpha=0.5)
-    # plt.title("Formation Movement (Mean Velocity) over Time")
-    # plt.xlabel("Steps")
-    # plt.ylabel("Mean Node Velocity")
-    # plt.yscale('log')
-    # plt.grid(True)
-    # os.makedirs('results', exist_ok=True)
-    # plt.savefig('results/demo_error.png')
-    # print("    Error plot saved to results/demo_error.png")
-
-    # # --- B. 3D Trajectory ---
-    # fig = plt.figure(figsize=(12, 10))
-    # ax = fig.add_subplot(111, projection='3d')
-    
-    # # Plot Key Frames
-    # # Start
-    # ax.scatter(all_data[0, 0, :], all_data[0, 1, :], all_data[0, 2, :], 
-    #            c='gray', alpha=0.3, label='Start')
-    
-    # # End of Phase 1 (Bar)
-    # idx_1 = steps_per_phase 
-    # ax.scatter(all_data[idx_1, 0, :], all_data[idx_1, 1, :], all_data[idx_1, 2, :], 
-    #            c='blue', marker='x', label='Bar Config')
-               
-    # # End of Phase 2 (V)
-    # idx_2 = 2 * steps_per_phase 
-    # ax.scatter(all_data[idx_2, 0, :], all_data[idx_2, 1, :], all_data[idx_2, 2, :], 
-    #            c='green', marker='^', label='V Config')
-
-    # # End of Phase 3 (W)
-    # ax.scatter(all_data[-1, 0, :], all_data[-1, 1, :], all_data[-1, 2, :], 
-    #            c='red', marker='o', label='W Config')
-
-    # # Draw Lines for a subset of nodes
-    # for i in range(0, N, 20):
-    #     ax.plot(all_data[:, 0, i], all_data[:, 1, i], all_data[:, 2, i], linewidth=0.5, alpha=0.3)
-
-    # ax.set_title("Multi-Cluster AFC Trajectory: Bar -> V -> W")
-    # ax.set_xlabel("X")
-    # ax.set_ylabel("Y")
-    # ax.set_zlabel("Z")
-    # ax.legend()
-    
-    # plt.savefig('results/demo_trajectory.png')
-    # print("    Trajectory plot saved to results/demo_trajectory.png")
-    # plt.show()
-
-    
+    ) 

@@ -1,71 +1,3 @@
-# import numpy as np
-# import os
-# import matplotlib.pyplot as plt
-# from src import stress
-# from src.utils.utils import stress_normalizer
-# from src.control import multicluster_afc_global, tracking_error, multicluster_afc_distributed
-# import src.utils.geometry as geometry
-
-# if __name__ == "__main__":
-
-#     nominal_config = geometry.random_config(100)
-#     D = nominal_config.shape[0]
-#     N = nominal_config.shape[1]
-#     init_config = np.random.rand(D, N)
-#     subgraph_glb_idx = [list(range(0, 65)), list(range(35, 100))] 
-
-#     hyperparam_dict = { 'alpha': 0.5, 'beta': 1, 'gamma': 0.1 }
-
-#     print(f"Geometry is partitioned into {len(subgraph_glb_idx)} subgraphs with sizes {[len(idx) for idx in subgraph_glb_idx]}.")
-
-#     stress_mat_list = stress.compute_stress_multicluster(nominal_config,
-#                                                          subgraph_glb_idx, 
-#                                                          hyperparam_dict,
-#                                                          parallel=True)
-
-#     print("Stress matrices computed.")
-#     leaders_glb_idx = np.random.choice(nominal_config.shape[1], 5, replace=False).tolist()
-
-#     TE_multicluster = tracking_error(multicluster_afc_global(
-#         nominal_config.copy(),
-#         subgraph_glb_idx,
-#         init_config = init_config.copy(),
-#         leaders_glb_idx = leaders_glb_idx,
-#         # leaders_glb_idx = [0,1,2],
-#         stress_mat_list = stress_mat_list,
-#         gain = 80,
-#         max_itr = 5000,
-#         dt = 0.01
-#         ), 
-#         nominal_config)
-    
-#     TE_multicluster_distributed = tracking_error(multicluster_afc_distributed(
-#         nominal_config.copy(),
-#         subgraph_glb_idx,
-#         leaders_glb_idx = leaders_glb_idx,
-#         # leaders_glb_idx = [6,7,17,25,31,41,47,59],
-#         stress_mat_list = stress_mat_list,
-#         gain = 80,
-#         max_itr = 5000,
-#         dt = 0.01,
-#         init_config = init_config.copy()
-#         ),
-#         nominal_config)
-    
-
-#     # print("Subgraph Global Indices:", subgraph_glb_idx)
-#     plt.figure()
-#     plt.plot(TE_multicluster)
-#     plt.plot(TE_multicluster_distributed, linestyle='--')
-#     plt.legend(["Multicluster AFC - Global", "Multicluster AFC - Distributed"])
-#     plt.title("Tracking Error - Multicluster AFC")
-#     plt.xlabel("Iteration")
-#     plt.ylabel("Tracking Error")
-#     plt.grid()
-#     plt.yscale('log')
-#     plt.savefig("results/multicluster_afc_tracking_error.png")
-#     plt.show()
-        
 import os
 import yaml
 import numpy as np
@@ -100,9 +32,6 @@ def get_partition_indices(n_nodes, overlap):
     return [idx1, idx2]
 
 def generate_data(cfg):
-    """
-    Part 1: Generates random configs, computes stress matrices, and saves them.
-    """
     print("\n--- Part 1: Generating Data ---")
     output_dir = cfg['experiment']['output_dir']
     os.makedirs(output_dir, exist_ok=True)
@@ -125,10 +54,10 @@ def generate_data(cfg):
                 continue
 
             
-            # 2. Define Subgraphs
+            # Define Subgraphs
             subgraph_glb_idx = get_partition_indices(cfg['experiment']['n_nodes'], overlap)
             
-            # 3. Compute Stress Matrices
+            # Compute Stress Matrices
             stress_mat_list = stress.compute_stress_multicluster(
                 nominal_config,
                 subgraph_glb_idx, 
@@ -136,7 +65,7 @@ def generate_data(cfg):
                 parallel=True
             )
             
-            # 4. Save Data Package
+            # Save Data Package
             data_package = {
                 'nominal_config': nominal_config,
                 'subgraph_glb_idx': subgraph_glb_idx,
@@ -148,9 +77,7 @@ def generate_data(cfg):
             np.save(filepath, data_package)
 
 def evaluate_and_plot(cfg):
-    """
-    Part 2: Loads matrices, runs control sim, and plots results.
-    """
+
     print("\n--- Part 2: Evaluating and Plotting ---")
     input_dir = cfg['experiment']['output_dir']
     plot_dir = cfg['experiment']['plot_dir']
@@ -161,20 +88,6 @@ def evaluate_and_plot(cfg):
     n_afc_runs = cfg['experiment']['n_afc_runs']
     prefix = cfg['experiment']['filename_prefix']
     
-    # Storage for results: results[overlap]['global'] = [ [error_trace_1], [error_trace_2], ... ]
-    # results = {ov: {'global': [], 'dist': []} for ov in overlaps}
-
-    # total_runs = len(overlaps) * n_trials
-    # pbar = tqdm(total=total_runs, desc="Running Simulations")
-
-    # for afc_run in tqdm(range(cfg['experiment']['n_afc_runs']), desc="Running Simulations"):
-    # total_files = len(overlaps) * n_trials
-    # init_config = 5*np.random.rand(2, cfg['experiment']['n_nodes']) 
-    # leaders_idx = np.random.choice(cfg['experiment']['n_nodes'], cfg['control']['n_leaders'], replace=False).tolist()
-    # find random leaders in the first cluster
-    # leaders_idx = np.random.choice(get_partition_indices(cfg['experiment']['n_nodes'], overlaps[0])[0], cfg['control']['n_leaders'], replace=False).tolist()
-    # print(f"Selected Leaders (Global Indices): {leaders_idx}")
-    # fix leader for plotting
     leaders_idx = [47, 40, 28, 29, 34]
     results = {ov: {'global': []} for ov in overlaps}
 
@@ -200,7 +113,7 @@ def evaluate_and_plot(cfg):
             
             D, N = nominal.shape
 
-            # 2. Run Multiple Random Initializations for this specific geometry
+            # Run Multiple Random Initializations for this specific geometry
             for run_idx in range(n_afc_runs):
                 
                 # Generate new random initial configuration for this run
@@ -306,17 +219,17 @@ def plot_configurations(cfg):
         only_c2 = list(set_c2 - set_c1)
         
         # --- Plotting ---
-        # 1. Cluster 1 (Unique nodes)
+        # Cluster 1 (Unique nodes)
         if only_c1:
             ax.scatter(nominal[0, only_c1], nominal[1, only_c1], 
                        c=cfg["cluster_colors"]["cluster_1"], s=80, alpha=0.6, label='Cluster 1 Only')
             
-        # 2. Cluster 2 (Unique nodes)
+        # Cluster 2 (Unique nodes)
         if only_c2:
             ax.scatter(nominal[0, only_c2], nominal[1, only_c2], 
                        c=cfg["cluster_colors"]["cluster_2"], s=80, alpha=0.6, label='Cluster 2 Only')
             
-        # 3. Overlap (Shared nodes) -> Special Marker
+        # Overlap (Shared nodes) -> Special Marker
         if intersection:
             ax.scatter(nominal[0, intersection], nominal[1, intersection], 
                        c=cfg["cluster_colors"]["mutual"], marker='X', s=200, label='Overlap', zorder=10)
@@ -326,10 +239,6 @@ def plot_configurations(cfg):
         ax.set_aspect('equal')
         ax.set_xticks([])
         ax.set_yticks([])
-        
-        # # Only add legend to the first plot to avoid clutter
-        # if i == 0:
-        #     ax.legend(loc='upper right', fontsize='small', framealpha=0.9)
 
     save_path = os.path.join(plot_dir, "config-random-100-overlap.pdf")
     plt.savefig(save_path, dpi=300)
@@ -372,14 +281,14 @@ def plot_overlap_eigenvalues(cfg):
             stress_mats = data['stress_mat_list']
             sub_idx = data['subgraph_glb_idx']
             
-            # 1. Reconstruct the global stress matrix
+            # Reconstruct the global stress matrix
             # (Assuming find_global_stress_mat is available from your earlier code)
             global_stress = find_global_stress_mat(stress_mats, sub_idx, n_nodes)
             
-            # 2. Normalize the global stress matrix
+            # Normalize the global stress matrix
             global_stress = stress_normalizer(global_stress)
             
-            # 3. Calculate sorted eigenvalues
+            # Calculate sorted eigenvalues
             eigvals = np.sort(np.real(np.linalg.eigvals(global_stress)))
             all_eigvals.append(eigvals)
             
@@ -387,7 +296,7 @@ def plot_overlap_eigenvalues(cfg):
             print(f"[Warn] No data found for overlap {overlap}")
             continue
             
-        # 4. Aggregate statistics across all trials
+        # Aggregate statistics across all trials
         all_eigvals = np.array(all_eigvals)
         mean_eigvals = np.mean(all_eigvals, axis=0)
         std_eigvals = np.std(all_eigvals, axis=0)
@@ -407,11 +316,6 @@ def plot_overlap_eigenvalues(cfg):
     # plt.xscale('log')
     plt.xlim(0.8, 10.5)
     plt.ylim(-0.01, 0.35)
-    
-    # # Clean up X-axis ticks (e.g., show every 10th index, plus the first one)
-    # tick_positions = np.append([1], np.arange(10, n_nodes + 1, 10))
-    # plt.xticks(ticks=tick_positions, labels=tick_positions)
-    # plt.xlim(-0.5, 9.5)
     plt.xticks(ticks=np.arange(11), labels=np.arange(0, 11))
     
     plt.grid(True, linestyle='--', alpha=0.5)

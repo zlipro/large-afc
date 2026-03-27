@@ -50,7 +50,7 @@ def eval_runtime(raw_data):
     print("\n--- Evaluating Runtimes [s] ---")
     records = []
 
-    # 1. Extract Data
+    # Extract Data
     for case in raw_data:
         if 'runtimes' in case:
             for algo_name, duration in case['runtimes'].items():
@@ -66,7 +66,7 @@ def eval_runtime(raw_data):
 
     df = pd.DataFrame(records)
 
-    # 2. Print Statistics
+    # Print Statistics
     stats = df.groupby('Algorithm')['Time (s)'].agg(['mean', 'std', 'min', 'max'])
     print(stats)
 
@@ -108,7 +108,7 @@ def eval_eigs(raw_data):
     print("\n--- Evaluating Eigenvalues ---")
     records = []
 
-    # 1. Extract Data
+    # Extract Data
     for case in raw_data:
         geom_type = case.get('geometry_type', 'unknown')
         num_nodes = case['nominal_config'].shape[1]
@@ -119,10 +119,7 @@ def eval_eigs(raw_data):
                 if stress_mat is None:
                     continue
                 
-                # KEY CHANGE: specific check for MC lists
                 if isinstance(stress_mat, list):
-                    # We skip the list version because we expect a separate key 
-                    # (e.g., 'custom_mc_global') containing the combined matrix.
                     continue
 
 
@@ -165,7 +162,7 @@ def eval_eigs(raw_data):
     stats_d2 = df.groupby('Algorithm')['lambda_d2'].agg(['mean', 'std', 'min', 'max'])
     print(stats_d2)
 
-    # B. Statistics for the Largest Eigenvalue (Spectral Radius)
+    # Statistics for the Largest Eigenvalue (Spectral Radius)
     print(f"\n[Statistics: Largest Eigenvalue (Spectral Radius)]")
     stats_max = df.groupby('Algorithm')['lambda_max'].agg(['mean', 'std', 'min', 'max'])
     print(stats_max)
@@ -179,16 +176,15 @@ def plot_eigs_circular(raw_data, cfg, sparse_tol=1e-5):
     print("\n--- Plotting Eigenvalues ---")
     if not raw_data: return
 
-    # 1. Randomly pick ONE case
+    # Randomly pick a case
     case = random.choice(raw_data)
     
-    # 2. Get Config Maps
-    # Safe lookup: checks root first, then 'evaluation'
+    # Get Config Maps
     eval_cfg = cfg.get('evaluation', cfg) 
     color_map = eval_cfg.get('line_colors', {})
     marker_map = eval_cfg.get('line_markers', {})
     
-    # 3. Fallbacks
+    # Fallbacks
     fallback_colors = itertools.cycle(['gray', 'black', 'brown'])
     fallback_markers = itertools.cycle(['.', 'x', '+'])
 
@@ -209,24 +205,19 @@ def plot_eigs_circular(raw_data, cfg, sparse_tol=1e-5):
                 edge_count = detect_num_edges(stress_mat, sparse_tol)
                 eigvals = np.sort(np.real(np.linalg.eigvals(stress_mat)))
                 
-                # --- DIRECT LOOKUP (Simpler!) ---
-                # 1. Color
                 if algo_name in color_map:
                     color = color_map[algo_name]
                 else:
                     color = next(fallback_colors)
                     print(f"[Info] Key '{algo_name}' not in config. Using fallback.")
 
-                # 2. Marker
                 if algo_name in marker_map:
                     marker = marker_map[algo_name]
                 else:
                     marker = next(fallback_markers)
 
-                # 3. Line Style
                 linestyle = '-' if 'custom' in name_lower else '--'
 
-                # Plot
                 plt.plot(eigvals, 
                          label=f"{algo_name} ({edge_count} edges)", 
                          color=color,
@@ -262,21 +253,21 @@ def plot_afc_error(raw_data, cfg):
         print("[Warn] No data available.")
         return
 
-    # 1. Randomly pick ONE case
+    # Randomly pick 1 case
     case = random.choice(raw_data)
     target_config = case['nominal_config'] 
     
-    # 2. Setup Leaders (First D+1 nodes are standard for affine control)
+    # Setup Leaders (First D+1 nodes are standard for affine control)
     dim = target_config.shape[0]
     leader_ids = list(range(dim + 1)) 
     init_config = 3* np.random.rand(dim, target_config.shape[1])
 
-    # 3. Get Config Maps
+    # Get Config Maps
     eval_cfg = cfg.get('evaluation', cfg) 
     color_map = eval_cfg.get('line_colors', {})
     marker_map = eval_cfg.get('line_markers', {})
     
-    # 4. Fallbacks
+    # Fallbacks
     fallback_colors = itertools.cycle(['gray', 'black', 'brown'])
     fallback_markers = itertools.cycle(['.', 'x', '+'])
 
@@ -284,12 +275,11 @@ def plot_afc_error(raw_data, cfg):
     
     plots_generated = False
     
-    # 5. Iterate Algorithms
+    # Iterate Algorithms
     if 'stress_matrices' in case:
         for algo_name, stress_mat in case['stress_matrices'].items():
             if stress_mat is None: continue
             
-            # --- Filtering ---
             name_lower = algo_name.lower()
             if 'mc' in name_lower or 'usi' in name_lower: continue
             if isinstance(stress_mat, list): continue
@@ -298,29 +288,23 @@ def plot_afc_error(raw_data, cfg):
                 # Normalize Stress Matrix
                 stress_mat = stress_normalizer(stress_mat)
                 
-                
                 error = tracking_error(affine_formation_control_global(
                     target_config, 
                     stress_mat, 
                     leader_ids, 
                     gain=cfg['evaluation']['afc_params']['gain'], 
-                    max_itr=cfg['evaluation']['afc_params']['max_itr'], # Cap iterations for plotting speed
+                    max_itr=cfg['evaluation']['afc_params']['max_itr'],
                     dt=cfg['evaluation']['afc_params']['dt'],
                     init_config=init_config.copy()
                 ), target_config)
 
-                # --- STYLE LOOKUP ---
-                # 1. Color
                 if algo_name in color_map:
                     color = color_map[algo_name]
                 else:
                     color = next(fallback_colors)
 
-
-                # 3. Line Style
                 linestyle = '-' if 'custom' in name_lower else '--'
 
-                # Plot (Log Scale for Y is standard for convergence)
                 time = np.arange(len(error)) * cfg['evaluation']['afc_params']['dt']
                 
                 plt.semilogy(time, error, 
@@ -362,11 +346,9 @@ def plot_all_metrics(df, cfg):
 
     print("\n--- Plotting Metrics on Ordinal Axis (All Geometries) ---")
 
-    # ---------------------------------------------------------
-    # 1. DATA FILTERING & PREPARATION
-    # ---------------------------------------------------------
+    # DATA FILTERING & PREPARATION
     
-    # A. Filter Geometries
+    # Filter Geometries
     target_geoms = [
         'random', 'circular', 'cuboctahedron', 
         'truncated_icosahedron', 'truncated-icosahedron'
@@ -377,19 +359,18 @@ def plot_all_metrics(df, cfg):
         print("[Warn] No matching geometry cases found.")
         return
 
-    # B. Filter Algorithms (Remove USI & raw lists)
+    # Filter Algorithms (Remove USI & raw lists)
     plot_df = plot_df[~plot_df['Algorithm'].str.lower().str.contains('usi')]
     
     exclude_list = [f'custom_mc_{i}' for i in range(10)]
     plot_df = plot_df[~plot_df['Algorithm'].isin(exclude_list)]
 
-    # C. Rename for Legend & Linking
+    # Rename for Legend & Linking
     # 'custom_mc_1_global' -> 'custom_mc_1'
     plot_df['Algorithm'] = plot_df['Algorithm'].str.replace('_global', '', regex=False)
 
-    # D. Calculate Spectral Efficiency
+    #  Calculate Spectral Efficiency
     # Formula: N^2 * lambda_{d+2} / (lambda_max * edge_count)
-    # Using .loc to avoid SettingWithCopy warnings
     valid_mask = (plot_df['lambda_max'] > 0) & (plot_df['edge_count'] > 0)
     plot_df.loc[valid_mask, 'spectral_eff'] = (
         (plot_df.loc[valid_mask, 'N']**2 * plot_df.loc[valid_mask, 'lambda_d2']) / 
@@ -405,9 +386,8 @@ def plot_all_metrics(df, cfg):
     plot_df['avg_degree'] = 2 * plot_df['edge_count'] / plot_df['N']
 
 
-    # ---------------------------------------------------------
-    # 2. CREATE ORDINAL X-AXIS MAPPING
-    # ---------------------------------------------------------
+
+    # CREATE ORDINAL X-AXIS MAPPING
     # Get all unique (Geometry, N) pairs
     unique_conditions = plot_df[['geometry_type', 'N']].drop_duplicates()
     
@@ -432,9 +412,7 @@ def plot_all_metrics(df, cfg):
     # Merge index back to main DF
     plot_df = pd.merge(plot_df, unique_conditions, on=['geometry_type', 'N'])
 
-    # ---------------------------------------------------------
-    # 3. PLOTTING LOOP (Metric by Metric)
-    # ---------------------------------------------------------
+    # PLOTTING LOOP (Metric by Metric)
     metrics_config = [
         {
             'col': 'lambda_d2',
@@ -578,7 +556,7 @@ def plot_spectral_efficiency_all(df, cfg):
         print("[Warn] DataFrame is empty. Cannot plot scaling.")
         return
 
-    # 1. Filter using Pandas
+    # Filter using Pandas
     plot_df = df[df['geometry_type'] == 'random'].copy()
     
     if plot_df.empty:
@@ -592,18 +570,17 @@ def plot_spectral_efficiency_all(df, cfg):
     # Rename custom_mc_global
     plot_df['Algorithm'] = plot_df['Algorithm'].replace({'custom_mc_global': 'custom_mc', 'custom_mc_global'.upper(): 'custom_mc'})
 
-    # ---> NEW: Calculate Spectral Efficiency
     # Filter out zeros just to be safe from division by zero errors
     valid_mask = (plot_df['lambda_max'] > 0) & (plot_df['edge_count'] > 0)
     plot_df = plot_df[valid_mask]
     
     plot_df['spectral_eff'] = plot_df['N']**2*plot_df['lambda_d2'] / (plot_df['lambda_max'] * plot_df['edge_count'])
 
-    # 2. Group by Algorithm and Nodes to get Mean/Std
+    # Group by Algorithm and Nodes to get Mean/Std
     grouped = plot_df.groupby(['Algorithm', 'N'])['spectral_eff'].agg(['mean', 'std']).reset_index()
     grouped['std'] = grouped['std'].fillna(0)
 
-    # 3. Setup Config Styles
+    # Setup Config Styles
     eval_cfg = cfg.get('evaluation', cfg) 
     color_map = eval_cfg.get('line_colors', {})
     marker_map = eval_cfg.get('line_markers', {})
@@ -611,7 +588,7 @@ def plot_spectral_efficiency_all(df, cfg):
     fallback_colors = itertools.cycle(['gray', 'black', 'brown', 'purple'])
     fallback_markers = itertools.cycle(['.', 'x', '+', '*'])
 
-    # 4. Plot
+    # Plot
     plt.figure(figsize=(6, 5))
     
     for algo_name in grouped['Algorithm'].unique():

@@ -116,7 +116,7 @@ def truncated_icosahedron(outlining_graph = False):
     unique_vertices = set()
 
     for base in base_seeds:
-        # 1. Generate Cyclic Permutations: (x,y,z), (y,z,x), (z,x,y)
+        # Generate Cyclic Permutations: (x,y,z), (y,z,x), (z,x,y)
         cyclic_perms = [
             (base[0], base[1], base[2]),
             (base[1], base[2], base[0]),
@@ -124,7 +124,7 @@ def truncated_icosahedron(outlining_graph = False):
         ]
         
         for p in cyclic_perms:
-            # 2. Generate all Sign Combinations (2^3 = 8 per permutation)
+            # Generate all Sign Combinations (2^3 = 8 per permutation)
             for signs in product([-1, 1], repeat=3):
                 coords = (
                     p[0] * signs[0],
@@ -178,7 +178,7 @@ def nested_football(outlining_graph = False):
         vertices (3xN), adjacency (NxN), cluster_indices (list of arrays)
     """
     
-    # --- 1. Generate Base Unit (Head) ---
+    # --- Generate Base Unit (Head) ---
     phi = (1 + np.sqrt(5)) / 2
     base_seeds = [[0, 1, 3 * phi], [2, 1 + 2 * phi, phi], [1, 2 + phi, 2 * phi]]
     unique_verts = set()
@@ -190,7 +190,7 @@ def nested_football(outlining_graph = False):
     verts_head = np.array(list(unique_verts))
     num_nodes_per_unit = len(verts_head) # Should be 60
 
-    # --- 2. Identify Connectivity & Pentagons ---
+    # --- Identify Connectivity & Pentagons ---
     # Build Adjacency
     tree = KDTree(verts_head)
     pairs = tree.query_pairs(r=2.1)
@@ -218,7 +218,7 @@ def nested_football(outlining_graph = False):
                                 centroid = np.mean(verts_head[list(cycle)], axis=0)
                                 pentagon_centroids.append(centroid)
 
-    # --- 3. Select WIDER Attachment Sites ---
+    # --- Select WIDER Attachment Sites ---
     pL = pentagon_centroids[0]
     pR = None
     target_angle = 116.57
@@ -235,7 +235,6 @@ def nested_football(outlining_graph = False):
     if pR is None: 
         raise ValueError(f"Could not find pentagons separated by {target_angle} degrees.")
 
-    # --- 4. Robust Attachment Logic (Translate + Twist Check) ---
     def attach_ear(base_verts, face_centroid):
         trans_vec = 2.0 * face_centroid
         
@@ -262,7 +261,7 @@ def nested_football(outlining_graph = False):
     verts_L = attach_ear(verts_head, pL)
     verts_R = attach_ear(verts_head, pR)
 
-    # --- 5. Weld Vertices & Track Indices ---
+    # --- Weld Vertices & Track Indices ---
     all_verts = np.vstack([verts_head, verts_L, verts_R])
     
     # Array to map every original vertex to its new final index
@@ -299,7 +298,7 @@ def nested_football(outlining_graph = False):
     
     cluster_indices = [idx_head, idx_L, idx_R]
 
-    # --- 6. Orientation (Upright V-shape) ---
+    # --- Orientation (Upright V-shape) ---
     c_L = np.mean(verts_L, axis=0)
     c_R = np.mean(verts_R, axis=0)
     
@@ -323,22 +322,6 @@ def nested_football(outlining_graph = False):
     
     final_vertices = final_verts.T
 
-    # # --- 7. Adjacency Matrix ---
-    # num_v = final_vertices.shape[1]
-    # adj = np.zeros((num_v, num_v), dtype=int)
-    
-    # for i in range(num_v):
-    #     diffs = final_vertices.T[i+1:] - final_vertices.T[i]
-    #     dists_sq = np.sum(diffs**2, axis=1)
-    #     neighbors_idx = np.where(np.abs(dists_sq - 4.0) < 0.2)[0]
-        
-    #     true_j = neighbors_idx + (i + 1)
-    #     adj[i, true_j] = 1
-    #     adj[true_j, i] = 1
-    # if outlining_graph:
-    #     return final_vertices, cluster_indices, adj
-    # return final_vertices, cluster_indices
-    # --- Index Mapping (Without np.unique) ---
     idx_head = mapping[0 : num_nodes_per_unit]
     idx_L    = mapping[num_nodes_per_unit : 2*num_nodes_per_unit]
     idx_R    = mapping[2*num_nodes_per_unit : 3*num_nodes_per_unit]
