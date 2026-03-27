@@ -148,7 +148,8 @@ def eval_eigs(raw_data):
                         'lambda_d2': val_d2,
                         'eigenvalues': eigvals,
                         'lambda_max': val_max,
-                        'edge_count': edge_count
+                        'edge_count': edge_count,
+                        'max_edge_count': num_nodes * (num_nodes - 1) // 2
                     })
                 except Exception as e:
                     print(f"[Warn] Eig calc failed for {algo_name}: {e}")
@@ -461,7 +462,7 @@ def plot_all_metrics(df, cfg):
             'col': 'avg_degree',
             'ylabel': 'Average Degree ($2E/N$)',
             'filename': 'avg_degree.pdf',
-            'ylim': [1e-1, 1e2] # Average degree can vary widely
+            'ylim': [1e0, 1e3] # Average degree can vary widely
         }
     ]
 
@@ -529,6 +530,14 @@ def plot_all_metrics(df, cfg):
                 
                 plt.plot([x1, x2], [y1, y2], color=c, linestyle='-', linewidth=1.5, alpha=0.8)
 
+        if col == 'avg_degree':
+            x_vals = unique_conditions['x_idx'].values
+            # Max average degree for a complete graph is N - 1
+            max_avg_degree = unique_conditions['N'].values - 1 
+            
+            plt.plot(x_vals, max_avg_degree, label='Complete Graph', 
+                     color='black', linestyle=':', linewidth=2, alpha=0.7)
+        
         # Formatting
         # plt.title(metric['title'])
         plt.ylabel(metric['ylabel'])

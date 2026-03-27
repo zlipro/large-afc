@@ -138,7 +138,7 @@ else
                         RUN_BENCH_CIRCULAR_10=true
                         RUN_BENCH_CUBOCTAHEDRON=true
                         RUN_BENCH_TRUNC_ICOSAHEDRON=true
-                        RUN_BENCH_TRUNC_ICOSAHEDRON_LINKED=true
+                        # RUN_BENCH_TRUNC_ICOSAHEDRON_LINKED=true
                         RUN_BENCH_LETTER_W=true
                         ;;
                 esac

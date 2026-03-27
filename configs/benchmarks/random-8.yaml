@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-random-8"
-  total_runs: 50         # How many random cases to simulate
+  total_runs: 100         # How many random cases to simulate
   dim: 2                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 

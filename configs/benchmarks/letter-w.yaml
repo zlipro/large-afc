@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-letter-w"
-  total_runs: 1        
+  total_runs: 100        
   dim: 3                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 

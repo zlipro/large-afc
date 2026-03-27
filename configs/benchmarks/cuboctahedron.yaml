@@ -1,6 +1,6 @@
 experiment:
   name: "benchmark-cuboctahedron"
-  total_runs: 50         
+  total_runs: 100         
   dim: 3                  # Dimension of the geometry
   output_dir: "results/stress_mats"
 
@@ -33,7 +33,7 @@ baselines:
   yang2019: true
   xiao2022: false    
   li2026: true
-  lin2016: true
+  lin2016: false
 
 evaluation:
   # Where the .npy files are located
