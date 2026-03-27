@@ -23,10 +23,10 @@ This setup is tested on Ubuntu 24.04LTS with Python 3.12.12
     ```bash
     pip install -r requirements.txt
     ```
-3. SDP Solver Requirement:
+3. **SDP Solver Requirement:**
 Because this project relies heavily on solving Semidefinite Programs (SDPs), you will need a robust interior-point solver. We highly recommend installing MOSEK (free academic licenses available) or SCS/CVXOPT for use with CVXPY.
 
-4. Make the run script executable:
+4. **Make the run script executable:**
     ```bash
     chmod +x run.sh
     ```
@@ -47,9 +47,9 @@ Because this project relies heavily on solving Semidefinite Programs (SDPs), you
 
 ## 🏃 Quick Start (Demo)
 To instantly see the multicluster AFC in action using the "Letter W" linked geometry, simply run the script with no arguments (or the -demo flag):
-    ```bash
-    ./run.sh -demo
-    ```
+```bash
+./run.sh -demo
+```
 This will compute the optimal stress matrices, simulate the formation maneuver, and generate the corresponding trajectory plots.
 <p align="center">
   <img src="results/demo_formation.gif" alt="Large-Scale Affine Formation Control Demo" width="500"/>
@@ -75,7 +75,7 @@ Benchmarking takes a long time. You could change the number of Monte Carlo runs 
 # Run ALL benchmark cases sequentially
 ./run.sh -benchmark
 ```
-2. **2. Evaluating Results & Generating Plots**
+2. **Evaluating Results & Generating Plots**
 Once benchmarks are generated, use the -evaluate flag to process the data, calculate convergence rates/spectral efficiencies, and plot the graphs.
 ```bash
 # Evaluate a specific case
