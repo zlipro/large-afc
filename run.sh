@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# --- 1. Environment Setup ---
+# --- Environment Setup ---
 PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 cd "$PROJECT_ROOT"
 
-# --- 2. Helper Functions ---
+# --- Helper Functions ---
 function show_help {
     echo "Usage: ./run.sh [OPTIONS]"
     echo ""
@@ -42,7 +42,7 @@ function show_help {
     echo ""
 }
 
-# --- 3. Argument Parsing ---
+# --- Argument Parsing ---
 
 # Initialize flags
 RUN_DEMO=false
