@@ -1,229 +1,170 @@
 import numpy as np
+import scipy.sparse as sp
+import scipy.linalg as sla
 import cvxpy as cp
 
-from src.utils.utils import incidence_matrix_fully_connected, get_symmetry_mapping_matrix
+from src.utils.utils import get_symmetry_mapping_matrix
+
+# ---------------------------------------------------------------------------
+# Memory-efficient SDP construction (shared by P2 and P3/USI)
+#
+# The original formulation built  Psi @ diag(w) @ Psi.T  and  B @ diag(w) @ B.T
+# with cp.diag, which makes CVXPY materialise dense coefficient tensors and runs
+# out of memory around N = 60-100.  The constraints below are exactly equivalent
+# but sparse in the edge weights:
+#
+#   Omega = B diag(w) B^T            ->  vec(Omega) = K w   (4 nonzeros / column)
+#   Q^T Omega Q >= gamma I           ->  Omega + gamma U U^T >= gamma I
+#                                        (U orthonormal basis of range(Pbar^T);
+#                                         exact because Omega U = 0)
+#   ||Omega||_2 <= beta              ->  Omega <= beta I    (Omega is PSD)
+#   - alpha psi^T w                  ->  - alpha * 2 * 1^T w   (= tr(Omega); equal
+#                                         to psi^T w on the feasible set)
+#   E w = 0                          ->  (Pbar kron I) K w = 0, dependent rows removed
+# ---------------------------------------------------------------------------
+
+def _stress_map(N):
+    """Sparse K (N^2 x M) with vec_rowmajor(B diag(w) B^T) = K @ w.
+
+    Edge order matches incidence_matrix_fully_connected: (0,1), (0,2), ..., (N-2,N-1).
+    """
+    iu, ju = np.triu_indices(N, k=1)
+    M = iu.size
+    rows = np.concatenate([iu * N + iu, ju * N + ju, iu * N + ju, ju * N + iu])
+    cols = np.tile(np.arange(M), 4)
+    vals = np.concatenate([np.ones(2 * M), -np.ones(2 * M)])
+    return sp.csr_matrix((vals, (rows, cols)), shape=(N * N, M))
+
+
+def _equilibrium_rows(augmented_config_T, KG):
+    """Independent rows of the equilibrium constraint Pbar Omega = 0, as a sparse matrix in w."""
+    N = augmented_config_T.shape[1]
+    Ed = (sp.kron(sp.csr_matrix(augmented_config_T), sp.eye(N)) @ KG).toarray()
+    rank = np.linalg.matrix_rank(Ed)
+    _, _, piv = sla.qr(Ed.T, pivoting=True, mode="economic")
+    return sp.csr_matrix(Ed[np.sort(piv[:rank])])
+
+
+def _solve_stress_sdp(nominal_config, hyperparam_dict, group_map=None, solve_kwargs=None):
+    """
+    Solve P2 (group_map=None) or P3/USI (group_map = M x S edge-to-class matrix)
+    with the sparse formulation. Returns (stress_mat, prob, full_weights).
+    """
+    D, N = nominal_config.shape
+    alpha = hyperparam_dict['alpha']
+    beta = hyperparam_dict['beta']
+    gamma = hyperparam_dict['gamma']
+
+    Pbar = np.vstack([nominal_config, np.ones((1, N))])      # (D+1) x N
+    K = _stress_map(N)
+    G = sp.eye(K.shape[1], format="csr") if group_map is None else sp.csr_matrix(group_map)
+    KG = (K @ G).tocsr()
+    E_eq = _equilibrium_rows(Pbar, KG)
+    U = np.linalg.qr(Pbar.T)[0]                              # N x (D+1), orthonormal
+
+    theta = cp.Variable(G.shape[1])
+    weights = theta if group_map is None else G @ theta
+    Omega = cp.reshape(KG @ theta, (N, N), order="C")
+
+    obj = cp.Minimize(cp.norm(weights, 1) - alpha * 2.0 * cp.sum(weights))
+    constraints = [
+        Omega + gamma * (U @ U.T) >> gamma * np.eye(N),      # <=> Q^T Omega Q >= gamma I
+        Omega << beta * np.eye(N),                           # <=> ||Omega||_2 <= beta
+        E_eq @ theta == 0,                                   # <=> Omega Pbar^T = 0
+    ]
+    prob = cp.Problem(obj, constraints)
+    prob.solve(**(solve_kwargs or {}))
+
+    if theta.value is None:
+        return None, prob, None
+    w = np.asarray(G @ theta.value).ravel()
+    stress_mat = (K @ w).reshape(N, N)
+    return stress_mat, prob, w
+
+
+def _suggested_alpha(nominal_config):
+    """1 / max(psi), psi_e = ||Q^T b_e||^2, computed without forming Q^T B."""
+    D, N = nominal_config.shape
+    augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
+    Q = np.linalg.svd(augmented_config)[0][:, D + 1:]
+    QQ = Q @ Q.T
+    i, j = np.triu_indices(N, k=1)
+    psi = QQ[i, i] + QQ[j, j] - 2 * QQ[i, j]
+    return 1.0 / np.max(psi)
+
 
 def optimize_stress(nominal_config: np.ndarray, hyperparam_dict: dict, verbose=False):
 
         """
-        Our proposed framework to calculate the sparse stress matrix.
+        Our proposed framework to calculate the sparse stress matrix (P2).
         cvxpy is needed for the convex optimization.
-        
+
         nominal_config: np.ndarray
             The nominal configuration of shape (D, N) where D is the dimension and N is the number of nodes.
         hyperparam_dict: dict
             Dictionary containing the hyperparameters for the optimization
-            alpha: sparsity-convergence trade-off; beta: largest eigenvalue; gamma: smallest eigenvalue 
+            alpha: sparsity-convergence trade-off; beta: largest eigenvalue; gamma: smallest eigenvalue
         """
 
-        D, N = nominal_config.shape
-        incidence_full = incidence_matrix_fully_connected(N)
-        
-        M = incidence_full.shape[1]
-        
-        augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
-        U, _, _ = np.linalg.svd(augmented_config)
-        Q = U[:, D+1:]
-        
-        E = np.vstack([augmented_config.T @ incidence_full @ np.diag(incidence_full.T[:, n]) for n in range(N)])
-        Psi = Q.T @ incidence_full
-        
-        phi = np.diag(Psi.T @ Psi)
-
-        ########## Convex Optimization ##########
-        weights = cp.Variable(M)
-        
-        obj = cp.Minimize(cp.norm(weights, 1) - hyperparam_dict['alpha'] * phi.T @ weights)
-        constraints = [
-            cp.norm(incidence_full @ cp.diag(weights) @ incidence_full.T, 2) <= hyperparam_dict['beta'],
-            Psi @ cp.diag(weights) @ Psi.T - hyperparam_dict['gamma'] * np.eye(N - D - 1) >> 0,
-            E @ weights == 0
-        ]
-        
-        prob = cp.Problem(obj, constraints)
-        prob.solve(solver=cp.MOSEK)
-        # prob.solve(solver=cp.SCS)
-
-        weights_optimal = weights.value
+        stress_mat, prob, _ = _solve_stress_sdp(nominal_config, hyperparam_dict,
+                                                solve_kwargs=dict(solver=cp.MOSEK))
 
         if verbose:
-            print(f"suggested alpha: {1/np.max(phi)}")
+            print(f"suggested alpha: {_suggested_alpha(nominal_config)}")
 
-        # weights_optimal[np.abs(weights_optimal) < sparse_tol] = 0   # small weights to zero for plotting purpose
-
-        stress_mat = incidence_full @ np.diag(weights_optimal) @ incidence_full.T
         return stress_mat
-    
+
 def optimized_stress_symm(nominal_config: np.ndarray, hyperparam_dict: dict, verbose=False):
     """
     The Unique Stress Identifier (USI) method (Section IV, Algorithm P3).
     Optimizes stress using symmetry groups identified via EDM.
-    
+
     Args:
         nominal_config: np.ndarray (D, N)
         hyperparam_dict: dict with 'alpha', 'beta', 'gamma'
-        
+
     Returns:
         stress_mat: np.ndarray (N, N)
     """
-    D, N = nominal_config.shape
-    
-    # 1. Setup Basic Matrices (Full Graph)
-    incidence_full = incidence_matrix_fully_connected(N) # B matrix
-    M = incidence_full.shape[1]
-    
-    # 2. Symmetry Reduction (EDM Shortcut)
-    # Identify unique edge classes S based on geometry [cite: 267, 270]
+    # Symmetry Reduction (EDM Shortcut): omega_bar = S @ omega_underbar
     S_map, unique_dists = get_symmetry_mapping_matrix(nominal_config)
-    K_groups = S_map.shape[1]
-    
+
     if verbose:
-        print(f"USI Method: Reduced variables from {M} edges to {K_groups} unique groups.")
-    
-    # 3. Constraint Construction
-    # Nullspace basis Q
-    augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
-    U, _, _ = np.linalg.svd(augmented_config)
-    Q = U[:, D+1:]
-    
-    # E matrix for equilibrium constraints
-    E_full = np.vstack([augmented_config.T @ incidence_full @ np.diag(incidence_full.T[:, n]) for n in range(N)])
-    
-    # Psi matrix for PSD constraints
-    Psi = Q.T @ incidence_full
-    
-    # Pre-calculate phi for the objective function term
+        print(f"USI Method: Reduced variables from {S_map.shape[0]} edges to {S_map.shape[1]} unique groups.")
 
-    phi = np.diag(Psi.T @ Psi)
-
-    reduced_weights = cp.Variable(K_groups)
-    
-    # Map back to full weights: omega_bar = S @ omega_underbar [cite: 276]
-    weights = S_map @ reduced_weights
-    
-    # Note: cp.norm(weights, 1) automatically handles the mapping S
-    obj = cp.Minimize(cp.norm(weights, 1) - hyperparam_dict['alpha'] * phi.T @ weights)
-    
-    constraints = [
-        # Spectral norm bound [cite: 278]
-        cp.norm(incidence_full @ cp.diag(weights) @ incidence_full.T, 2) <= hyperparam_dict['beta'],
-        
-        # PSD Constraint (projected) [cite: 277]
-        Psi @ cp.diag(weights) @ Psi.T - hyperparam_dict['gamma'] * np.eye(N - D - 1) >> 0,
-        
-        # Equilibrium Constraint [cite: 279]
-        E_full @ weights == 0
-    ]
-    
-    prob = cp.Problem(obj, constraints)
     try:
-        prob.solve(solver=cp.SCS, verbose=verbose)
-    except:
-        prob.solve(solver=cp.CVXOPT, verbose=verbose)
+        stress_mat, prob, _ = _solve_stress_sdp(nominal_config, hyperparam_dict, group_map=S_map,
+                                                solve_kwargs=dict(solver=cp.SCS, verbose=verbose))
+    except Exception:
+        stress_mat, prob, _ = _solve_stress_sdp(nominal_config, hyperparam_dict, group_map=S_map,
+                                                solve_kwargs=dict(solver=cp.CVXOPT, verbose=verbose))
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         print(f"Warning: Problem status is {prob.status}")
         return None
 
-    # Recover full weights
-    weights_optimal = weights.value
-    
-    # Construct Stress Matrix
-    stress_mat = incidence_full @ np.diag(weights_optimal) @ incidence_full.T
-    
     return stress_mat
 
 def optimized_stress_symm_acc(nominal_config: np.ndarray, hyperparam_dict: dict, verbose=False):
     """
     Optimized Symmetric Stress (Fast Version).
-    Speedup obtained by pre-reducing constraints and objective to size K (groups)
-    instead of M (edges).
+    Same problem as optimized_stress_symm, with only K (groups) variables,
+    solved with MOSEK when available.
     """
-    D, N = nominal_config.shape
-    
-    # Setup & Symmetry Detection
-    incidence_full = incidence_matrix_fully_connected(N)
     S_map, unique_dists = get_symmetry_mapping_matrix(nominal_config)
-    K_groups = S_map.shape[1]
-    
+
     if verbose:
-        print(f"USI Method: Collapsing {S_map.shape[0]} edges -> {K_groups} groups.")
+        print(f"USI Method: Collapsing {S_map.shape[0]} edges -> {S_map.shape[1]} groups.")
 
-    # Pre-compute Geometry (Standard)
-    augmented_config = np.hstack((nominal_config.T, np.ones((N, 1))))
-    U, _, _ = np.linalg.svd(augmented_config)
-    Q = U[:, D+1:]
-    
-    Psi = Q.T @ incidence_full
-    phi = np.diag(Psi.T @ Psi)
-    
-    group_counts = np.sum(S_map, axis=0) # Shape (K,)
-    
-    # Reduced linear term: phi^T @ S
-    phi_reduced = phi @ S_map # Shape (K,)
-
-
-    E_full = np.vstack([augmented_config.T @ incidence_full @ np.diag(incidence_full.T[:, n]) for n in range(N)])
-    E_reduced = E_full @ S_map # Shape (Constraints, K)
-
-    
-    # For PSD: P_k = Psi * diag(col_k of S) * Psi.T
-    PSD_matrices = []
-    # For Spectral: L_k = B * diag(col_k of S) * B.T
-    Spectral_matrices = []
-    
-    for k in range(K_groups):
-        # Extract the column as a diagonal mask (much faster than full matrix mult)
-        # S_map[:, k] is a binary vector indicating which edges belong to group k
-        edge_mask = S_map[:, k]
-        
-        # Reduced PSD term for this group
-        # Corresponds to: Psi @ diag(edge_mask) @ Psi.T
-        Psi_k = Psi[:, edge_mask > 0.5] 
-        P_k = Psi_k @ Psi_k.T
-        PSD_matrices.append(P_k)
-        
-        Inc_k = incidence_full[:, edge_mask > 0.5]
-        L_k = Inc_k @ Inc_k.T
-        Spectral_matrices.append(L_k)
-
-    
-    reduced_weights = cp.Variable(K_groups)
-    
-    # Objective: Weighted L1 norm - reduced linear term
-    # Note: cp.multiply does element-wise mult
-    obj_term_1 = cp.sum(cp.multiply(group_counts, cp.abs(reduced_weights)))
-    obj_term_2 = hyperparam_dict['alpha'] * (phi_reduced @ reduced_weights)
-    obj = cp.Minimize(obj_term_1 - obj_term_2)
-    
-    constraints = [
-        # Equilibrium: Simple matrix mult (Constraints x K)
-        E_reduced @ reduced_weights == 0,
-        
-        # PSD: Sum of K matrices (N-D-1 x N-D-1)
-        cp.sum([reduced_weights[k] * PSD_matrices[k] for k in range(K_groups)]) 
-            - hyperparam_dict['gamma'] * np.eye(N - D - 1) >> 0,
-            
-        # Spectral: Sum of K matrices (N x N)
-        cp.norm(cp.sum([reduced_weights[k] * Spectral_matrices[k] for k in range(K_groups)]), 2) 
-            <= hyperparam_dict['beta']
-    ]
-    
-    prob = cp.Problem(obj, constraints)
-    
-    # Use MOSEK if available, otherwise SCS
-    # MOSEK is vastly superior for these "Sum of terms" SDPs
-    prob.solve(solver=cp.MOSEK if 'MOSEK' in cp.installed_solvers() else cp.SCS, verbose=verbose)
+    # MOSEK is vastly superior for these SDPs
+    solver = cp.MOSEK if 'MOSEK' in cp.installed_solvers() else cp.SCS
+    stress_mat, prob, _ = _solve_stress_sdp(nominal_config, hyperparam_dict, group_map=S_map,
+                                            solve_kwargs=dict(solver=solver, verbose=verbose))
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         if verbose: print(f"Warning: Problem status {prob.status}")
         return None
 
-    # Recover full weights for output
-    w_reduced_opt = reduced_weights.value
-    weights_optimal = S_map @ w_reduced_opt
-    
-    stress_mat = incidence_full @ np.diag(weights_optimal) @ incidence_full.T
     return stress_mat
 
 def compute_stress_multicluster(target_config, subgraph_glb_idx, hyperparam_dict, parallel=True):
